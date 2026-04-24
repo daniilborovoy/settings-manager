@@ -52,9 +52,11 @@ fn main() {
             commands::create_project,
             commands::rename_project,
             commands::delete_project,
+            commands::reorder_projects,
             commands::create_source,
             commands::rename_source,
             commands::delete_source,
+            commands::reorder_sources,
             commands::get_variables,
             commands::save_variables,
         ])

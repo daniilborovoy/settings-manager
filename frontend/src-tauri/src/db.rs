@@ -92,6 +92,7 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
         "CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         )",
         [],
@@ -103,6 +104,7 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             config TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE
         )",
@@ -110,7 +112,10 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     )?;
 
     migrate_add_project_id(&conn)?;
+    migrate_add_sort_order(&conn)?;
     backfill_default_project(&conn)?;
+    backfill_project_sort_order(&conn)?;
+    backfill_source_sort_order(&conn)?;
 
     Ok(conn)
 }
@@ -153,10 +158,83 @@ fn backfill_default_project(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+fn migrate_add_sort_order(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(projects)")?;
+    let project_has_sort_order = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .filter_map(|r| r.ok())
+        .any(|col| col == "sort_order");
+    drop(stmt);
+
+    if !project_has_sort_order {
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+
+    let mut stmt = conn.prepare("PRAGMA table_info(sources)")?;
+    let source_has_sort_order = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .filter_map(|r| r.ok())
+        .any(|col| col == "sort_order");
+    drop(stmt);
+
+    if !source_has_sort_order {
+        conn.execute(
+            "ALTER TABLE sources ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn backfill_project_sort_order(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("SELECT id FROM projects ORDER BY sort_order, id")?;
+    let ids: Vec<i64> = stmt.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?;
+    drop(stmt);
+
+    for (index, id) in ids.into_iter().enumerate() {
+        conn.execute(
+            "UPDATE projects SET sort_order = ?1 WHERE id = ?2",
+            params![index as i64, id],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn backfill_source_sort_order(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("SELECT id, project_id FROM sources ORDER BY project_id, sort_order, id")?;
+    let rows: Vec<(i64, i64)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    drop(stmt);
+
+    let mut current_project_id = None;
+    let mut order = 0_i64;
+
+    for (id, project_id) in rows {
+        if current_project_id != Some(project_id) {
+            current_project_id = Some(project_id);
+            order = 0;
+        }
+
+        conn.execute(
+            "UPDATE sources SET sort_order = ?1 WHERE id = ?2",
+            params![order, id],
+        )?;
+        order += 1;
+    }
+
+    Ok(())
+}
+
 /* ── Projects ── */
 
 pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
-    let mut stmt = conn.prepare("SELECT id, name, created_at FROM projects ORDER BY id")?;
+    let mut stmt = conn.prepare("SELECT id, name, created_at FROM projects ORDER BY sort_order, id")?;
     let rows = stmt.query_map([], row_to_project)?;
     rows.collect()
 }
@@ -164,7 +242,7 @@ pub fn list_projects(conn: &Connection) -> rusqlite::Result<Vec<Project>> {
 pub fn list_projects_with_sources(conn: &Connection) -> rusqlite::Result<Vec<ProjectWithSources>> {
     let projects = list_projects(conn)?;
     let mut stmt = conn.prepare(
-        "SELECT id, project_id, name, type, created_at FROM sources ORDER BY id",
+        "SELECT id, project_id, name, type, created_at FROM sources ORDER BY project_id, sort_order, id",
     )?;
     let all_sources: Vec<SourceSummary> = stmt
         .query_map([], row_to_source_summary)?
@@ -190,9 +268,14 @@ pub fn list_projects_with_sources(conn: &Connection) -> rusqlite::Result<Vec<Pro
 
 pub fn create_project(conn: &Connection, name: &str) -> rusqlite::Result<Project> {
     let now = Utc::now();
+    let sort_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM projects",
+        [],
+        |row| row.get(0),
+    )?;
     conn.execute(
-        "INSERT INTO projects (name, created_at) VALUES (?1, ?2)",
-        params![name, now],
+        "INSERT INTO projects (name, sort_order, created_at) VALUES (?1, ?2, ?3)",
+        params![name, sort_order, now],
     )?;
     let id = conn.last_insert_rowid();
     Ok(Project {
@@ -223,6 +306,27 @@ pub fn delete_project(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     Ok(deleted > 0)
 }
 
+pub fn reorder_projects(conn: &mut Connection, ordered_ids: &[i64]) -> rusqlite::Result<()> {
+    let total: i64 = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+    if total != ordered_ids.len() as i64 {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "ordered_ids must contain every project exactly once".into(),
+        ));
+    }
+
+    let tx = conn.transaction()?;
+    for (index, id) in ordered_ids.iter().enumerate() {
+        let updated = tx.execute(
+            "UPDATE projects SET sort_order = ?1 WHERE id = ?2",
+            params![index as i64, id],
+        )?;
+        if updated == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+    }
+    tx.commit()
+}
+
 /* ── Sources ── */
 
 pub fn get_source(conn: &Connection, id: i64) -> rusqlite::Result<Option<Source>> {
@@ -244,10 +348,15 @@ pub fn create_source(
     config: &serde_json::Value,
 ) -> rusqlite::Result<Source> {
     let now = Utc::now();
+    let sort_order: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM sources WHERE project_id = ?1",
+        params![project_id],
+        |row| row.get(0),
+    )?;
     let config_str = serde_json::to_string(config).expect("config serialize");
     conn.execute(
-        "INSERT INTO sources (project_id, name, type, config, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![project_id, name, type_, config_str, now],
+        "INSERT INTO sources (project_id, name, type, config, sort_order, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![project_id, name, type_, config_str, sort_order, now],
     )?;
     let id = conn.last_insert_rowid();
     Ok(Source {
@@ -274,4 +383,33 @@ pub fn rename_source(conn: &Connection, id: i64, name: &str) -> rusqlite::Result
 pub fn delete_source(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     let deleted = conn.execute("DELETE FROM sources WHERE id = ?1", params![id])?;
     Ok(deleted > 0)
+}
+
+pub fn reorder_sources(
+    conn: &mut Connection,
+    project_id: i64,
+    ordered_ids: &[i64],
+) -> rusqlite::Result<()> {
+    let total: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sources WHERE project_id = ?1",
+        params![project_id],
+        |row| row.get(0),
+    )?;
+    if total != ordered_ids.len() as i64 {
+        return Err(rusqlite::Error::InvalidParameterName(
+            "ordered_ids must contain every source in the project exactly once".into(),
+        ));
+    }
+
+    let tx = conn.transaction()?;
+    for (index, id) in ordered_ids.iter().enumerate() {
+        let updated = tx.execute(
+            "UPDATE sources SET sort_order = ?1 WHERE id = ?2 AND project_id = ?3",
+            params![index as i64, id, project_id],
+        )?;
+        if updated == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+    }
+    tx.commit()
 }

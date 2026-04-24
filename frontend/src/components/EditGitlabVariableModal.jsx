@@ -60,7 +60,7 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`} onClick={requestClose}>
+    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
       <div className={`modal gitlab-var-modal ${valueExpanded ? 'expanded' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{isNew ? 'Add variable' : 'Edit variable'}</h2>
@@ -71,6 +71,7 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
             <div className="form-group">
               <label>Type</label>
               <select
+                style={{height: "36px"}}
                 value={draft.variable_type ?? 'env_var'}
                 onChange={e => update({ variable_type: e.target.value })}
               >

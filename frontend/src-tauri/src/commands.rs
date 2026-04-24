@@ -59,6 +59,15 @@ pub fn delete_project(state: State<'_, AppState>, id: i64) -> Result<(), String>
     Ok(())
 }
 
+#[tauri::command]
+pub fn reorder_projects(
+    state: State<'_, AppState>,
+    ordered_ids: Vec<i64>,
+) -> Result<(), String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::reorder_projects(&mut conn, &ordered_ids).map_err(map_db_err)
+}
+
 /* ── Sources ── */
 
 #[tauri::command]
@@ -95,6 +104,16 @@ pub fn delete_source(state: State<'_, AppState>, id: i64) -> Result<(), String> 
         return Err("Source not found".into());
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn reorder_sources(
+    state: State<'_, AppState>,
+    project_id: i64,
+    ordered_ids: Vec<i64>,
+) -> Result<(), String> {
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::reorder_sources(&mut conn, project_id, &ordered_ids).map_err(map_db_err)
 }
 
 #[tauri::command]

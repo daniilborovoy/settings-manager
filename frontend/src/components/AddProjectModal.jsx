@@ -23,7 +23,7 @@ export default function AddProjectModal({ onClose, onAdd }) {
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`} onClick={requestClose}>
+    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>New Project</h2>

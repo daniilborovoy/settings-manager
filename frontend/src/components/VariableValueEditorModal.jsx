@@ -31,7 +31,7 @@ export default function VariableValueEditorModal({ varKey, value, onSave, onClos
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`} onClick={requestClose}>
+    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
       <div className="var-value-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="var-value-modal-key">{varKey}</h2>

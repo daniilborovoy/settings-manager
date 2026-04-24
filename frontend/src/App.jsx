@@ -106,6 +106,22 @@ export default function App() {
     } catch { /* already logged */ }
   }
 
+  async function handleReorderProjects(orderedIds) {
+    const previousProjects = projects
+    const reorderedProjects = orderedIds
+      .map(id => previousProjects.find(project => project.id === id))
+      .filter(Boolean)
+
+    if (reorderedProjects.length !== previousProjects.length) return
+
+    setProjects(reorderedProjects)
+    try {
+      await api.reorderProjects(orderedIds)
+    } catch {
+      setProjects(previousProjects)
+    }
+  }
+
   async function handleAddSource(sourceData) {
     await api.createSource({ projectId: addSourceForProject, ...sourceData })
     await fetchProjects()
@@ -125,6 +141,29 @@ export default function App() {
       if (selectedSource?.id === sourceId) setSelectedSource(null)
       await fetchProjects()
     } catch { /* already logged */ }
+  }
+
+  async function handleReorderSources(projectId, orderedIds) {
+    const projectIndex = projects.findIndex(project => project.id === projectId)
+    if (projectIndex === -1) return
+
+    const previousProjects = projects
+    const project = projects[projectIndex]
+    const reorderedSources = orderedIds
+      .map(id => project.sources.find(source => source.id === id))
+      .filter(Boolean)
+
+    if (reorderedSources.length !== project.sources.length) return
+
+    const nextProjects = [...projects]
+    nextProjects[projectIndex] = { ...project, sources: reorderedSources }
+    setProjects(nextProjects)
+
+    try {
+      await api.reorderSources(projectId, orderedIds)
+    } catch {
+      setProjects(previousProjects)
+    }
   }
 
   async function handleCopyFrom(fromSourceId) {
@@ -157,8 +196,10 @@ export default function App() {
           onSelectSource={s => { setView('sources'); setSelectedSource(s) }}
           onRenameProject={handleRenameProject}
           onDeleteProject={handleDeleteProject}
+          onReorderProjects={handleReorderProjects}
           onRenameSource={handleRenameSource}
           onDeleteSource={handleDeleteSource}
+          onReorderSources={handleReorderSources}
           onAddSource={projectId => { setView('sources'); setAddSourceForProject(projectId) }}
         />
         <div className="sidebar-footer">
@@ -175,6 +216,10 @@ export default function App() {
       </div>
 
       <div className="main">
+        <hr style={{
+          height: "1px",
+          color: '#eee'
+        }}/>
         {view === 'logs' ? (
           <LogsPage />
         ) : selectedSource ? (

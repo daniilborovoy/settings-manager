@@ -43,7 +43,7 @@ export default function AddSourceModal({ onClose, onAdd, projectName }) {
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`} onClick={requestClose}>
+    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{projectName ? `Add Source to ${projectName}` : 'Add Source'}</h2>
@@ -62,7 +62,7 @@ export default function AddSourceModal({ onClose, onAdd, projectName }) {
           </div>
           <div className="form-group">
             <label>Type</label>
-            <select value={type} onChange={e => { setType(e.target.value); setConfig({}) }}>
+            <select style={{height: "32px"}} value={type} onChange={e => { setType(e.target.value); setConfig({}) }}>
               {SOURCE_TYPES.map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
