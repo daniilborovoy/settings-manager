@@ -26,20 +26,13 @@ Most teams end up with variables scattered across:
 
 ## Screenshot
 
-Add your primary app screenshot here.
-
-```md
 ![Main App Screenshot](./docs/screenshots/main.png)
-```
 
 ## More Screenshots
 
-```md
-![Sidebar and Variables](./docs/screenshots/sidebar-and-variables.png)
 ![Value Editor](./docs/screenshots/value-editor.png)
 ![GitLab Variable Editor](./docs/screenshots/gitlab-variable-editor.png)
 ![Logs](./docs/screenshots/logs.png)
-```
 
 ## Current Feature Set
 
@@ -186,7 +179,6 @@ Recommended folder:
 docs/
   screenshots/
     main.png
-    sidebar-and-variables.png
     value-editor.png
     gitlab-variable-editor.png
     logs.png
