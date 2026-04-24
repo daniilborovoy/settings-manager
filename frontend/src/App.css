@@ -651,14 +651,13 @@ body {
 /* ── Variable Value Editor Modal ── */
 .var-value-modal {
   background: #282c34;
-  border-radius: 16px;
-  width: 80vw;
-  max-width: 960px;
-  height: 70vh;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  border-radius: 0;
   transform: scale(0.94) translateY(12px);
   opacity: 0;
   animation: modal-in var(--dur-slow) var(--ease-ios-spring) forwards;
@@ -696,6 +695,14 @@ body {
   background: #21252b;
   border-top: 1px solid #181a1f;
   padding: 12px 20px;
+}
+
+.editor-modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .lang-tabs {
@@ -863,6 +870,11 @@ body {
   animation: backdrop-in var(--dur-slow) var(--ease-ios) forwards;
 }
 
+.modal-backdrop.editor-backdrop {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 .modal-backdrop.closing {
   animation: backdrop-out var(--dur-med) var(--ease-ios) forwards;
 }
@@ -1003,18 +1015,26 @@ body {
 
 /* ── GitLab variable edit modal ── */
 .gitlab-var-modal {
-  width: 620px;
-  max-width: 92vw;
-}
-
-.gitlab-var-modal.expanded {
-  width: 900px;
+  width: 100vw;
+  max-width: none;
+  max-height: none;
+  height: 100vh;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .gitlab-var-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.gitlab-var-modal form {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .radio-list,
@@ -1122,16 +1142,36 @@ body {
   color: #1e1e2e;
 }
 
+.btn-icon-dark {
+  border-color: #3f4652;
+  color: #abb2bf;
+}
+
+.btn-icon-dark:hover {
+  background: #2d333d;
+  border-color: #596273;
+  color: #ffffff;
+}
+
+.editor-format-error {
+  padding: 10px 20px 0;
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.editor-format-error-light {
+  padding: 0 0 8px;
+  color: #b91c1c;
+}
+
 .value-editor {
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  overflow: hidden;
-  height: 180px;
-  transition: height var(--dur-med) var(--ease-ios);
-}
-
-.value-editor.expanded {
-  height: 400px;
+  overflow: auto;
+  height: min(60vh, 560px);
+  min-height: 260px;
+  max-height: calc(100vh - 320px);
+  resize: vertical;
 }
 
 .value-editor .cm-editor {

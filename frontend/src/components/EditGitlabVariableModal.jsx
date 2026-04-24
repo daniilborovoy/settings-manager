@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { yaml } from '@codemirror/lang-yaml'
-import { StreamLanguage } from '@codemirror/language'
-import { toml } from '@codemirror/legacy-modes/mode/toml'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useModalClose } from '../lib/useModalClose'
+import { detectLang, formatEditorValue, getCodeMirrorExtensions, LANGS } from '../lib/codeEditor'
 
 const TYPES = [
   { value: 'env_var', label: 'Variable' },
@@ -25,24 +23,16 @@ function flagsFromVisibility(visibility) {
   }
 }
 
-function detectLang(value) {
-  if (/^---(\n|$)/.test(value) || /^\w[\w.]*:\s+\S/m.test(value)) return 'yaml'
-  if (/^\[[\w.]+\]/m.test(value) || /^\w[\w.]*\s*=\s*\S/m.test(value)) return 'toml'
-  return 'text'
-}
-
 export default function EditGitlabVariableModal({ variable, isNew, onSave, onClose }) {
   const [draft, setDraft] = useState({ ...variable })
   const [lang, setLang] = useState(() => detectLang(variable.value || ''))
-  const [valueExpanded, setValueExpanded] = useState(false)
+  const [formatError, setFormatError] = useState('')
   const { closing, requestClose } = useModalClose(onClose)
 
   const visibility = visibilityFromFlags(draft)
   const expand = !(draft.raw ?? false)
 
-  const extensions = lang === 'yaml' ? [yaml()]
-    : lang === 'toml' ? [StreamLanguage.define(toml)]
-    : []
+  const extensions = useMemo(() => getCodeMirrorExtensions(lang), [lang])
 
   function update(patch) {
     setDraft(prev => ({ ...prev, ...patch }))
@@ -50,6 +40,15 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
 
   function handleVisibilityChange(v) {
     update(flagsFromVisibility(v))
+  }
+
+  function handleFormat() {
+    try {
+      update({ value: formatEditorValue(draft.value || '', lang) })
+      setFormatError('')
+    } catch (error) {
+      setFormatError(error.message || 'Failed to format value')
+    }
   }
 
   function handleSubmit(e) {
@@ -60,8 +59,8 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
-      <div className={`modal gitlab-var-modal ${valueExpanded ? 'expanded' : ''}`} onClick={e => e.stopPropagation()}>
+    <div className={`modal-backdrop editor-backdrop ${closing ? 'closing' : ''}`}>
+      <div className="modal gitlab-var-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{isNew ? 'Add variable' : 'Edit variable'}</h2>
           <button className="btn-close" onClick={requestClose} type="button">×</button>
@@ -193,7 +192,7 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
               <label>Value</label>
               <div className="value-actions">
                 <div className="lang-tabs">
-                  {['yaml', 'toml', 'text'].map(l => (
+                  {LANGS.map(l => (
                     <button
                       key={l}
                       type="button"
@@ -207,17 +206,21 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
                 <button
                   type="button"
                   className="btn-icon"
-                  onClick={() => setValueExpanded(v => !v)}
-                  title={valueExpanded ? 'Collapse' : 'Expand'}
+                  onClick={handleFormat}
+                  title="Format value"
                 >
-                  {valueExpanded ? '⤡' : '⤢'}
+                  Format
                 </button>
               </div>
             </div>
-            <div className={`value-editor ${valueExpanded ? 'expanded' : ''}`}>
+            {formatError && <div className="editor-format-error editor-format-error-light">{formatError}</div>}
+            <div className="value-editor">
               <CodeMirror
                 value={draft.value}
-                onChange={v => update({ value: v })}
+                onChange={v => {
+                  update({ value: v })
+                  if (formatError) setFormatError('')
+                }}
                 extensions={extensions}
                 theme={oneDark}
                 height="100%"

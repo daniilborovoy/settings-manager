@@ -1,29 +1,25 @@
 import { useState, useMemo } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
-import { yaml } from '@codemirror/lang-yaml'
-import { StreamLanguage } from '@codemirror/language'
-import { toml } from '@codemirror/legacy-modes/mode/toml'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useModalClose } from '../lib/useModalClose'
-
-const LANGS = ['yaml', 'toml', 'text']
-
-function detectLang(value) {
-  if (/^---(\n|$)/.test(value) || /^\w[\w.]*:\s+\S/m.test(value)) return 'yaml'
-  if (/^\[[\w.]+\]/m.test(value) || /^\w[\w.]*\s*=\s*\S/m.test(value)) return 'toml'
-  return 'text'
-}
+import { detectLang, formatEditorValue, getCodeMirrorExtensions, LANGS } from '../lib/codeEditor'
 
 export default function VariableValueEditorModal({ varKey, value, onSave, onClose }) {
   const [lang, setLang] = useState(() => detectLang(value))
   const [draft, setDraft] = useState(value)
+  const [formatError, setFormatError] = useState('')
   const { closing, requestClose } = useModalClose(onClose)
 
-  const extensions = useMemo(() => {
-    if (lang === 'yaml') return [yaml()]
-    if (lang === 'toml') return [StreamLanguage.define(toml)]
-    return []
-  }, [lang])
+  const extensions = useMemo(() => getCodeMirrorExtensions(lang), [lang])
+
+  function handleFormat() {
+    try {
+      setDraft(formatEditorValue(draft, lang))
+      setFormatError('')
+    } catch (error) {
+      setFormatError(error.message || 'Failed to format value')
+    }
+  }
 
   function handleSave() {
     onSave(draft)
@@ -31,11 +27,11 @@ export default function VariableValueEditorModal({ varKey, value, onSave, onClos
   }
 
   return (
-    <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
+    <div className={`modal-backdrop editor-backdrop ${closing ? 'closing' : ''}`}>
       <div className="var-value-modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="var-value-modal-key">{varKey}</h2>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="editor-modal-actions">
             <div className="lang-tabs">
               {LANGS.map(l => (
                 <button
@@ -47,14 +43,22 @@ export default function VariableValueEditorModal({ varKey, value, onSave, onClos
                 </button>
               ))}
             </div>
+            <button className="btn-icon btn-icon-dark" onClick={handleFormat} type="button">
+              Format
+            </button>
             <button className="btn-close" onClick={requestClose}>×</button>
           </div>
         </div>
 
+        {formatError && <div className="editor-format-error">{formatError}</div>}
+
         <div className="var-value-cm">
           <CodeMirror
             value={draft}
-            onChange={setDraft}
+            onChange={nextValue => {
+              setDraft(nextValue)
+              if (formatError) setFormatError('')
+            }}
             extensions={extensions}
             theme={oneDark}
             height="100%"
