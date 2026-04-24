@@ -1,25 +1,41 @@
 import YAML from 'yaml'
+import { json } from '@codemirror/lang-json'
 import { yaml } from '@codemirror/lang-yaml'
 import { StreamLanguage } from '@codemirror/language'
 import { toml } from '@codemirror/legacy-modes/mode/toml'
 import parseToml from '@iarna/toml/parse-string'
 import stringifyToml from '@iarna/toml/stringify'
 
-export const LANGS = ['yaml', 'toml', 'text']
+export const LANGS = ['yaml', 'toml', 'json', 'text'] as const
 
-export function detectLang(value = '') {
+export type EditorLanguage = (typeof LANGS)[number]
+
+export function detectLang(value = ''): EditorLanguage {
+  const trimmed = value.trim()
+
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    try {
+      JSON.parse(trimmed)
+      return 'json'
+    } catch {}
+  }
+
   if (/^---(\n|$)/.test(value) || /^\w[\w.-]*:\s+\S/m.test(value)) return 'yaml'
   if (/^\[[\w.-]+\]/m.test(value) || /^\w[\w.-]*\s*=\s*\S/m.test(value)) return 'toml'
   return 'text'
 }
 
-export function getCodeMirrorExtensions(lang) {
+export function getCodeMirrorExtensions(lang: EditorLanguage) {
   if (lang === 'yaml') return [yaml()]
   if (lang === 'toml') return [StreamLanguage.define(toml)]
+  if (lang === 'json') return [json()]
   return []
 }
 
-export function formatEditorValue(value, lang) {
+export function formatEditorValue(value: string, lang: EditorLanguage) {
   if (!value) return ''
 
   if (lang === 'yaml') {
@@ -32,10 +48,14 @@ export function formatEditorValue(value, lang) {
     return stripTomlNumericSeparators(stringifyToml(parseToml(value)))
   }
 
+  if (lang === 'json') {
+    return `${JSON.stringify(JSON.parse(value), null, 2)}\n`
+  }
+
   return normalizePlainText(value)
 }
 
-function normalizePlainText(value) {
+function normalizePlainText(value: string) {
   const normalized = value
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -49,7 +69,7 @@ function normalizePlainText(value) {
   return normalized
 }
 
-function stripTomlNumericSeparators(value) {
+function stripTomlNumericSeparators(value: string) {
   let result = ''
   let token = ''
   let inBasicString = false
@@ -57,14 +77,14 @@ function stripTomlNumericSeparators(value) {
   let inMultilineBasicString = false
   let inMultilineLiteralString = false
 
-  for (let i = 0; i < value.length; i += 1) {
-    const char = value[i]
-    const next3 = value.slice(i, i + 3)
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]
+    const next3 = value.slice(index, index + 3)
 
     if (inMultilineBasicString) {
       if (next3 === '"""') {
         result += next3
-        i += 2
+        index += 2
         inMultilineBasicString = false
       } else {
         result += char
@@ -75,7 +95,7 @@ function stripTomlNumericSeparators(value) {
     if (inMultilineLiteralString) {
       if (next3 === "'''") {
         result += next3
-        i += 2
+        index += 2
         inMultilineLiteralString = false
       } else {
         result += char
@@ -86,8 +106,8 @@ function stripTomlNumericSeparators(value) {
     if (inBasicString) {
       result += char
       if (char === '\\') {
-        result += value[i + 1] ?? ''
-        i += 1
+        result += value[index + 1] ?? ''
+        index += 1
       } else if (char === '"') {
         inBasicString = false
       }
@@ -103,7 +123,7 @@ function stripTomlNumericSeparators(value) {
     if (next3 === '"""') {
       flushToken()
       result += next3
-      i += 2
+      index += 2
       inMultilineBasicString = true
       continue
     }
@@ -111,7 +131,7 @@ function stripTomlNumericSeparators(value) {
     if (next3 === "'''") {
       flushToken()
       result += next3
-      i += 2
+      index += 2
       inMultilineLiteralString = true
       continue
     }
@@ -149,7 +169,7 @@ function stripTomlNumericSeparators(value) {
   }
 }
 
-function normalizeTomlNumberToken(token) {
+function normalizeTomlNumberToken(token: string) {
   if (/^[+-]?\d[\d_]*$/.test(token)) {
     return token.replace(/_/g, '')
   }

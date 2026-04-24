@@ -2,18 +2,18 @@ import { useCallback, useEffect, useState } from 'react'
 
 const EXIT_MS = 260
 
-export function useModalClose(onClose) {
+export function useModalClose(onClose: () => void) {
   const [closing, setClosing] = useState(false)
 
   const requestClose = useCallback(() => {
     if (closing) return
     setClosing(true)
-    setTimeout(onClose, EXIT_MS)
+    window.setTimeout(onClose, EXIT_MS)
   }, [closing, onClose])
 
   useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.key === 'Escape') requestClose()
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') requestClose()
     }
 
     window.addEventListener('keydown', handleKeyDown)

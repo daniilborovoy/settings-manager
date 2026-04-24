@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react'
 import { subscribe, clearLogs } from '../lib/logger'
+import type { LogEntry } from '../types'
 
-function statusClass(log) {
+function statusClass(log: LogEntry) {
   return log.ok ? 'log-ok' : 'log-err'
 }
 
-function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString('en-GB', { hour12: false })
+function formatTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString('en-GB', { hour12: false })
 }
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState([])
-  const [expandedId, setExpandedId] = useState(null)
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => subscribe(setLogs), [])
 
-  function toggle(id) {
-    setExpandedId(prev => (prev === id ? null : id))
+  function toggle(id: string) {
+    setExpandedId(current => (current === id ? null : id))
   }
 
   return (
@@ -32,7 +33,7 @@ export default function LogsPage() {
       </div>
 
       {logs.length === 0 ? (
-        <div className="logs-empty">No calls yet — interact with the app to see logs here.</div>
+        <div className="logs-empty">No calls yet - interact with the app to see logs here.</div>
       ) : (
         <div className="logs-list">
           {logs.map(log => (

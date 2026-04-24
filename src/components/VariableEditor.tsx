@@ -157,7 +157,12 @@ export default function VariableEditor({
         {filtered.map(({ v, index }) => {
           const badges = isGitlab ? badgeList(v) : []
           return (
-            <div key={v._clientId ?? index} className="table-row">
+            <div
+              key={v._clientId ?? index}
+              className="table-row"
+              onDoubleClick={() => openEditor(index)}
+              title="Double-click to open the editor"
+            >
               <div className="var-key-cell">
                 <span className="var-key">{v.key || <em className="var-key-empty">(unnamed)</em>}</span>
                 {badges.length > 0 && (
@@ -177,14 +182,21 @@ export default function VariableEditor({
               />
               <button
                 className="btn-expand-var"
-                onClick={() => openEditor(index)}
+                onClick={event => {
+                  event.stopPropagation()
+                  openEditor(index)
+                }}
                 title={isGitlab ? 'Edit variable' : 'Open in editor'}
               >
-                ⤢
+                <span className="btn-expand-var-icon">⤢</span>
+                <span>{isGitlab ? 'Edit' : 'Open'}</span>
               </button>
               <button
                 className="btn-delete-var"
-                onClick={() => deleteAt(index)}
+                onClick={event => {
+                  event.stopPropagation()
+                  deleteAt(index)
+                }}
                 title="Delete variable"
               >
                 ×

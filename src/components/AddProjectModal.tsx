@@ -1,22 +1,33 @@
 import { useState } from 'react'
 import { useModalClose } from '../lib/useModalClose'
 
-export default function AddProjectModal({ onClose, onAdd }) {
+interface AddProjectModalProps {
+  onClose: () => void
+  onAdd: (name: string) => Promise<void>
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export default function AddProjectModal({ onClose, onAdd }: AddProjectModalProps) {
   const [name, setName] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { closing, requestClose } = useModalClose(onClose)
 
-  async function handleSubmit(e) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     if (!name.trim()) return
+
     setError(null)
     setLoading(true)
+
     try {
       await onAdd(name.trim())
       requestClose()
-    } catch (e) {
-      setError(e.message)
+    } catch (error) {
+      setError(getErrorMessage(error))
     } finally {
       setLoading(false)
     }
@@ -24,7 +35,7 @@ export default function AddProjectModal({ onClose, onAdd }) {
 
   return (
     <div className={`modal-backdrop ${closing ? 'closing' : ''}`}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={event => event.stopPropagation()}>
         <div className="modal-header">
           <h2>New Project</h2>
           <button className="btn-close" onClick={requestClose}>×</button>
@@ -36,7 +47,7 @@ export default function AddProjectModal({ onClose, onAdd }) {
               type="text"
               autoFocus
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={event => setName(event.target.value)}
               placeholder="Backend, Mobile, ..."
               required
             />

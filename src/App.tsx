@@ -7,32 +7,37 @@ import LogsPage from './components/LogsPage'
 import * as api from './lib/api'
 import { subscribe } from './lib/logger'
 import { assignIds, stripIds, normalizeForType, normalizedForCompare } from './lib/variables'
+import type { Project, Source, Variable } from './types'
+
+type View = 'sources' | 'logs'
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
 
 export default function App() {
-  const [projects, setProjects] = useState([])
-  const [selectedSource, setSelectedSource] = useState(null)
-  const [variables, setVariables] = useState([])
-  const [originalVariables, setOriginalVariables] = useState([])
-  const [addSourceForProject, setAddSourceForProject] = useState(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedSource, setSelectedSource] = useState<Source | null>(null)
+  const [variables, setVariables] = useState<Variable[]>([])
+  const [originalVariables, setOriginalVariables] = useState<Variable[]>([])
+  const [addSourceForProject, setAddSourceForProject] = useState<number | null>(null)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [loadingVars, setLoadingVars] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [view, setView] = useState('sources')
+  const [view, setView] = useState<View>('sources')
   const [logErrorCount, setLogErrorCount] = useState(0)
 
   useEffect(() => {
-    fetchProjects()
+    void fetchProjects()
   }, [])
 
-  useEffect(() => {
-    return subscribe(logs => setLogErrorCount(logs.filter(l => !l.ok).length))
-  }, [])
+  useEffect(() => subscribe(logs => setLogErrorCount(logs.filter(log => !log.ok).length)), [])
 
   useEffect(() => {
     if (selectedSource) {
-      fetchVariables(selectedSource.id)
+      void fetchVariables(selectedSource.id)
     } else {
       setVariables([])
       setOriginalVariables([])
@@ -43,26 +48,27 @@ export default function App() {
   async function fetchProjects() {
     const data = await api.listProjectsWithSources()
     setProjects(data)
-    if (selectedSource && !data.some(p => p.sources.some(s => s.id === selectedSource.id))) {
+
+    if (selectedSource && !data.some(project => project.sources.some(source => source.id === selectedSource.id))) {
       setSelectedSource(null)
     }
   }
 
-  const allSources = projects.flatMap(p =>
-    p.sources.map(s => ({ ...s, projectName: p.name }))
+  const allSources = projects.flatMap(project =>
+    project.sources.map(source => ({ ...source, projectName: project.name }))
   )
 
-  async function fetchVariables(sourceId) {
+  async function fetchVariables(sourceId: number) {
     setLoadingVars(true)
     setError(null)
     setSaveSuccess(false)
+
     try {
-      const vars = await api.getVariables(sourceId)
-      const withIds = assignIds(vars)
+      const withIds = assignIds(await api.getVariables(sourceId))
       setVariables(withIds)
       setOriginalVariables(withIds)
-    } catch (e) {
-      setError(e.message)
+    } catch (error) {
+      setError(getErrorMessage(error))
       setVariables([])
       setOriginalVariables([])
     } finally {
@@ -71,46 +77,48 @@ export default function App() {
   }
 
   async function handleSave() {
+    if (!selectedSource) return
+
     setSaving(true)
     setError(null)
     setSaveSuccess(false)
+
     try {
-      const payload = stripIds(variables)
-      await api.saveVariables(selectedSource.id, payload)
+      await api.saveVariables(selectedSource.id, stripIds(variables))
       setOriginalVariables(variables)
       setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (e) {
-      setError(e.message)
+      window.setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      setError(getErrorMessage(error))
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleAddProject(name) {
+  async function handleAddProject(name: string) {
     await api.createProject(name)
     await fetchProjects()
   }
 
-  async function handleRenameProject(id, name) {
+  async function handleRenameProject(id: number, name: string) {
     try {
       await api.renameProject(id, name)
       await fetchProjects()
-    } catch { /* already logged */ }
+    } catch {}
   }
 
-  async function handleDeleteProject(id) {
+  async function handleDeleteProject(id: number) {
     try {
       await api.deleteProject(id)
       await fetchProjects()
-    } catch { /* already logged */ }
+    } catch {}
   }
 
-  async function handleReorderProjects(orderedIds) {
+  async function handleReorderProjects(orderedIds: number[]) {
     const previousProjects = projects
     const reorderedProjects = orderedIds
       .map(id => previousProjects.find(project => project.id === id))
-      .filter(Boolean)
+      .filter((project): project is Project => Boolean(project))
 
     if (reorderedProjects.length !== previousProjects.length) return
 
@@ -122,28 +130,29 @@ export default function App() {
     }
   }
 
-  async function handleAddSource(sourceData) {
+  async function handleAddSource(sourceData: { name: string, type: Source['type'], config: Record<string, string> }) {
+    if (addSourceForProject === null) return
     await api.createSource({ projectId: addSourceForProject, ...sourceData })
     await fetchProjects()
   }
 
-  async function handleRenameSource(sourceId, name) {
+  async function handleRenameSource(sourceId: number, name: string) {
     try {
       const updated = await api.renameSource(sourceId, name)
       await fetchProjects()
       if (selectedSource?.id === sourceId) setSelectedSource(updated)
-    } catch { /* already logged */ }
+    } catch {}
   }
 
-  async function handleDeleteSource(sourceId) {
+  async function handleDeleteSource(sourceId: number) {
     try {
       await api.deleteSource(sourceId)
       if (selectedSource?.id === sourceId) setSelectedSource(null)
       await fetchProjects()
-    } catch { /* already logged */ }
+    } catch {}
   }
 
-  async function handleReorderSources(projectId, orderedIds) {
+  async function handleReorderSources(projectId: number, orderedIds: number[]) {
     const projectIndex = projects.findIndex(project => project.id === projectId)
     if (projectIndex === -1) return
 
@@ -151,7 +160,7 @@ export default function App() {
     const project = projects[projectIndex]
     const reorderedSources = orderedIds
       .map(id => project.sources.find(source => source.id === id))
-      .filter(Boolean)
+      .filter((source): source is Source => Boolean(source))
 
     if (reorderedSources.length !== project.sources.length) return
 
@@ -166,18 +175,19 @@ export default function App() {
     }
   }
 
-  async function handleCopyFrom(fromSourceId) {
+  async function handleCopyFrom(fromSourceId: number) {
+    if (!selectedSource) return
+
     try {
-      const vars = await api.getVariables(fromSourceId)
-      const normalized = normalizeForType(vars, selectedSource.type)
+      const normalized = normalizeForType(await api.getVariables(fromSourceId), selectedSource.type)
       setVariables(normalized)
-    } catch (e) {
-      setError(e.message)
+    } catch (error) {
+      setError(getErrorMessage(error))
     }
   }
 
   const isDirty = normalizedForCompare(variables) !== normalizedForCompare(originalVariables)
-  const addSourceProject = projects.find(p => p.id === addSourceForProject)
+  const addSourceProject = projects.find(project => project.id === addSourceForProject)
 
   return (
     <div className="app">
@@ -185,41 +195,45 @@ export default function App() {
         <div className="sidebar-header">
           <button
             className="btn-add"
-            onClick={() => { setView('sources'); setShowProjectModal(true) }}
+            onClick={() => {
+              setView('sources')
+              setShowProjectModal(true)
+            }}
           >
             + Add Project
           </button>
         </div>
         <ProjectList
           projects={projects}
-          selectedSourceId={view === 'sources' ? selectedSource?.id : null}
-          onSelectSource={s => { setView('sources'); setSelectedSource(s) }}
+          selectedSourceId={view === 'sources' ? selectedSource?.id ?? null : null}
+          onSelectSource={source => {
+            setView('sources')
+            setSelectedSource(source)
+          }}
           onRenameProject={handleRenameProject}
           onDeleteProject={handleDeleteProject}
           onReorderProjects={handleReorderProjects}
           onRenameSource={handleRenameSource}
           onDeleteSource={handleDeleteSource}
           onReorderSources={handleReorderSources}
-          onAddSource={projectId => { setView('sources'); setAddSourceForProject(projectId) }}
+          onAddSource={projectId => {
+            setView('sources')
+            setAddSourceForProject(projectId)
+          }}
         />
         <div className="sidebar-footer">
           <button
             className={`btn-logs ${view === 'logs' ? 'active' : ''}`}
-            onClick={() => setView(v => v === 'logs' ? 'sources' : 'logs')}
+            onClick={() => setView(current => (current === 'logs' ? 'sources' : 'logs'))}
           >
             <span>Logs</span>
-            {logErrorCount > 0 && (
-              <span className="log-error-badge">{logErrorCount}</span>
-            )}
+            {logErrorCount > 0 && <span className="log-error-badge">{logErrorCount}</span>}
           </button>
         </div>
       </div>
 
       <div className="main">
-        <hr style={{
-          height: "1px",
-          color: '#eee'
-        }}/>
+        <hr style={{ height: '1px', color: '#eee' }} />
         {view === 'logs' ? (
           <LogsPage />
         ) : selectedSource ? (
@@ -229,7 +243,7 @@ export default function App() {
             variables={variables}
             onChange={setVariables}
             onSave={handleSave}
-            onRefresh={() => fetchVariables(selectedSource.id)}
+            onRefresh={() => void fetchVariables(selectedSource.id)}
             onCopyFrom={handleCopyFrom}
             loading={loadingVars}
             saving={saving}
