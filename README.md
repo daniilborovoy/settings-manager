@@ -171,19 +171,6 @@ Areas worth building next:
 - Large production bundle on the frontend
 - Provider coverage is still intentionally narrow
 
-## README Assets To Add Later
-
-Recommended folder:
-
-```text
-docs/
-  screenshots/
-    main.png
-    value-editor.png
-    gitlab-variable-editor.png
-    logs.png
-```
-
 ## License
 
 MIT. See [LICENSE](./LICENSE).
