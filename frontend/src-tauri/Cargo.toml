@@ -1,0 +1,25 @@
+[package]
+name = "settings-manager"
+version = "0.1.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-sdk-lambda = "1"
+aws-credential-types = "1"
+aws-types = "1"
+chrono = { version = "0.4", features = ["serde"] }
+urlencoding = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5"
+objc2-foundation = { version = "0.2", features = ["NSString"] }
