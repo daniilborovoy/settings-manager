@@ -55,6 +55,7 @@ fn main() {
             commands::reorder_projects,
             commands::create_source,
             commands::rename_source,
+            commands::update_gitlab_token,
             commands::delete_source,
             commands::reorder_sources,
             commands::get_variables,

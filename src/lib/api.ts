@@ -38,6 +38,8 @@ export const reorderProjects = (orderedIds: number[]) => call<void>('reorder_pro
 export const createSource = ({ projectId, name, type, config }: CreateSourceInput) =>
   call<number>('create_source', { projectId, name, type, config })
 export const renameSource = (id: number, name: string) => call<Source>('rename_source', { id, name })
+export const updateGitlabToken = (id: number, token: string) =>
+  call<void>('update_gitlab_token', { id, token })
 export const deleteSource = (id: number) => call<void>('delete_source', { id })
 export const reorderSources = (projectId: number, orderedIds: number[]) =>
   call<void>('reorder_sources', { projectId, orderedIds })

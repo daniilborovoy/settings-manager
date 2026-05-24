@@ -4,6 +4,7 @@ import AddProjectModal from './components/AddProjectModal'
 import ProjectList from './components/ProjectList'
 import VariableEditor from './components/VariableEditor'
 import LogsPage from './components/LogsPage'
+import UpdateTokenModal from './components/UpdateTokenModal'
 import * as api from './lib/api'
 import { subscribe } from './lib/logger'
 import { assignIds, stripIds, normalizeForType, normalizedForCompare } from './lib/variables'
@@ -13,6 +14,10 @@ type View = 'sources' | 'logs'
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function isAuthError(message: string) {
+  return message.includes('401')
 }
 
 export default function App() {
@@ -28,6 +33,7 @@ export default function App() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [view, setView] = useState<View>('sources')
   const [logErrorCount, setLogErrorCount] = useState(0)
+  const [tokenPrompt, setTokenPrompt] = useState<{ source: Source, retry: () => Promise<void> } | null>(null)
 
   useEffect(() => {
     void fetchProjects()
@@ -63,17 +69,35 @@ export default function App() {
     setError(null)
     setSaveSuccess(false)
 
-    try {
+    // Throws on failure so the token modal's retry can surface a repeated 401.
+    const loadVariables = async () => {
       const withIds = assignIds(await api.getVariables(sourceId))
       setVariables(withIds)
       setOriginalVariables(withIds)
+    }
+
+    try {
+      await loadVariables()
     } catch (error) {
-      setError(getErrorMessage(error))
+      const message = getErrorMessage(error)
       setVariables([])
       setOriginalVariables([])
+      if (maybePromptToken(message, loadVariables)) return
+      setError(message)
     } finally {
       setLoadingVars(false)
     }
+  }
+
+  // Returns true when the failure is a GitLab auth error and the token modal was opened.
+  // `retry` must reject on failure so a repeated 401 keeps the modal open.
+  function maybePromptToken(message: string, retry: () => Promise<void>): boolean {
+    if (selectedSource?.type === 'gitlab_cicd' && isAuthError(message)) {
+      setError(null)
+      setTokenPrompt({ source: selectedSource, retry })
+      return true
+    }
+    return false
   }
 
   async function handleSave() {
@@ -83,13 +107,18 @@ export default function App() {
     setError(null)
     setSaveSuccess(false)
 
-    try {
+    const persist = async () => {
       await api.saveVariables(selectedSource.id, stripIds(variables))
       setOriginalVariables(variables)
       setSaveSuccess(true)
       window.setTimeout(() => setSaveSuccess(false), 3000)
+    }
+
+    try {
+      await persist()
     } catch (error) {
-      setError(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      if (!maybePromptToken(message, persist)) setError(message)
     } finally {
       setSaving(false)
     }
@@ -270,6 +299,17 @@ export default function App() {
           projectName={addSourceProject?.name}
           onClose={() => setAddSourceForProject(null)}
           onAdd={handleAddSource}
+        />
+      )}
+
+      {tokenPrompt && (
+        <UpdateTokenModal
+          sourceName={tokenPrompt.source.name}
+          onUpdate={async token => {
+            await api.updateGitlabToken(tokenPrompt.source.id, token)
+            await tokenPrompt.retry()
+          }}
+          onClose={() => setTokenPrompt(null)}
         />
       )}
     </div>

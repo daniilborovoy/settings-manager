@@ -380,6 +380,22 @@ pub fn rename_source(conn: &Connection, id: i64, name: &str) -> rusqlite::Result
     get_source(conn, id)
 }
 
+pub fn update_source_config(
+    conn: &Connection,
+    id: i64,
+    config: &serde_json::Value,
+) -> rusqlite::Result<Option<Source>> {
+    let config_str = serde_json::to_string(config).expect("config serialize");
+    let updated = conn.execute(
+        "UPDATE sources SET config = ?1 WHERE id = ?2",
+        params![config_str, id],
+    )?;
+    if updated == 0 {
+        return Ok(None);
+    }
+    get_source(conn, id)
+}
+
 pub fn delete_source(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     let deleted = conn.execute("DELETE FROM sources WHERE id = ?1", params![id])?;
     Ok(deleted > 0)

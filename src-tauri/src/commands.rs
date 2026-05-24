@@ -97,6 +97,32 @@ pub fn rename_source(
 }
 
 #[tauri::command]
+pub fn update_gitlab_token(
+    state: State<'_, AppState>,
+    id: i64,
+    token: String,
+) -> Result<(), String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    let source = db::get_source(&conn, id)
+        .map_err(map_db_err)?
+        .ok_or_else(|| "Source not found".to_string())?;
+    if source.type_ != "gitlab_cicd" {
+        return Err("Source is not a GitLab CI/CD source".into());
+    }
+    let mut config = source.config;
+    match config.as_object_mut() {
+        Some(obj) => {
+            obj.insert("private_token".into(), serde_json::Value::String(token));
+        }
+        None => return Err("Source config is malformed".into()),
+    }
+    db::update_source_config(&conn, id, &config)
+        .map_err(map_db_err)?
+        .ok_or_else(|| "Source not found".to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn delete_source(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     let ok = db::delete_source(&conn, id).map_err(map_db_err)?;
