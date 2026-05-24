@@ -333,6 +333,13 @@ body {
   overflow: hidden;
 }
 
+.main-divider {
+  height: 1px;
+  border: none;
+  background: #eee;
+  flex-shrink: 0;
+}
+
 .empty-state {
   flex: 1;
   display: flex;
@@ -1465,4 +1472,261 @@ body {
   color: #991b1b;
   background: #fff5f5;
   border-color: #fecaca;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Dark mode — additive overrides. The light theme above is the
+   default and stays untouched; these rules apply only when
+   <html data-theme="dark">. Palette is aligned with the existing
+   dark sidebar (Catppuccin Mocha).
+   ════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --bg-app: #181825;       /* app background (under everything) */
+  --bg-surface: #1e1e2e;   /* cards, tables, modals, log rows */
+  --bg-elevated: #262637;  /* table/section headers, inset cards */
+  --bg-hover: #313244;     /* hover + active surfaces */
+  --bg-input: #15151f;     /* recessed inputs and code blocks */
+  --text: #cdd6f4;
+  --text-secondary: #b8c0e0;
+  --border: #313244;
+  --border-strong: #45475a;
+  --border-subtle: #26263a;
+}
+
+[data-theme="dark"] body {
+  background: var(--bg-app);
+  color: var(--text);
+}
+
+[data-theme="dark"] .main-divider {
+  background: var(--border);
+}
+
+/* Editor headings */
+[data-theme="dark"] .editor-title h2,
+[data-theme="dark"] .logs-header h2 {
+  color: var(--text);
+}
+
+/* Toolbar controls */
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .copy-from-select {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Variables table */
+[data-theme="dark"] .variables-table {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .table-header {
+  background: var(--bg-elevated);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .table-row {
+  border-bottom-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .table-row:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .var-key,
+[data-theme="dark"] .var-value {
+  color: var(--text);
+}
+
+[data-theme="dark"] .var-value:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .var-value:focus {
+  background: var(--bg-surface);
+}
+
+/* Add-variable row */
+[data-theme="dark"] .add-variable {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .add-key,
+[data-theme="dark"] .add-value {
+  background: var(--bg-input);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+[data-theme="dark"] .add-key:focus,
+[data-theme="dark"] .add-value:focus {
+  background: var(--bg-surface);
+}
+
+/* Buttons */
+[data-theme="dark"] .btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .btn-expand-var {
+  background: #2a2a4a;
+  border-color: #3b3b6b;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .btn-expand-var:hover {
+  background: #35356a;
+  border-color: #4f46e5;
+  color: #e0e7ff;
+}
+
+/* Error surfaces */
+[data-theme="dark"] .editor-error,
+[data-theme="dark"] .log-pre-error {
+  background: #2c1518;
+  border-color: #5b2327;
+  color: #f5a9a9;
+}
+
+[data-theme="dark"] .editor-format-error-light {
+  color: #fca5a5;
+}
+
+/* Modals */
+[data-theme="dark"] .modal {
+  background: var(--bg-surface);
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .modal-footer {
+  border-top-color: var(--border);
+}
+
+[data-theme="dark"] .btn-close:hover {
+  color: var(--text);
+}
+
+[data-theme="dark"] .form-group label {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select {
+  background: var(--bg-input);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* GitLab variable modal — option cards */
+[data-theme="dark"] .radio-item,
+[data-theme="dark"] .checkbox-item {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .radio-item:hover,
+[data-theme="dark"] .checkbox-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .radio-item strong,
+[data-theme="dark"] .checkbox-item strong {
+  color: var(--text);
+}
+
+[data-theme="dark"] .btn-icon {
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="dark"] .value-editor {
+  border-color: var(--border-strong);
+}
+
+/* Logs */
+[data-theme="dark"] .logs-header {
+  background: var(--bg-surface);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .logs-list {
+  background: var(--bg-app);
+}
+
+[data-theme="dark"] .log-entry {
+  background: var(--bg-surface);
+  border-bottom-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .log-summary:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .log-url {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .log-detail {
+  background: var(--bg-elevated);
+  border-top-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .log-pre {
+  background: var(--bg-input);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+/* Sidebar theme toggle (matches .btn-logs) */
+.btn-theme {
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  color: #6c7086;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  transition: background var(--dur-med) var(--ease-ios),
+              color var(--dur-med) var(--ease-ios),
+              transform var(--dur-fast) var(--ease-ios);
+}
+
+.btn-theme:hover {
+  background: #313244;
+  color: #cdd6f4;
+}
+
+.btn-theme:active {
+  transform: scale(0.985);
+  transition-duration: 80ms;
+}
+
+.btn-theme-icon {
+  font-size: 14px;
 }

@@ -11,9 +11,14 @@ import { assignIds, stripIds, normalizeForType, normalizedForCompare } from './l
 import type { Project, Source, Variable } from './types'
 
 type View = 'sources' | 'logs'
+type Theme = 'light' | 'dark'
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function getInitialTheme(): Theme {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
 }
 
 function isAuthError(message: string) {
@@ -34,6 +39,18 @@ export default function App() {
   const [view, setView] = useState<View>('sources')
   const [logErrorCount, setLogErrorCount] = useState(0)
   const [tokenPrompt, setTokenPrompt] = useState<{ source: Source, retry: () => Promise<void> } | null>(null)
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+
+  function toggleTheme() {
+    setTheme(prev => {
+      const next: Theme = prev === 'dark' ? 'light' : 'dark'
+      document.documentElement.setAttribute('data-theme', next)
+      try {
+        localStorage.setItem('theme', next)
+      } catch {}
+      return next
+    })
+  }
 
   useEffect(() => {
     void fetchProjects()
@@ -251,6 +268,10 @@ export default function App() {
           }}
         />
         <div className="sidebar-footer">
+          <button className="btn-theme" onClick={toggleTheme}>
+            <span className="btn-theme-icon">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
           <button
             className={`btn-logs ${view === 'logs' ? 'active' : ''}`}
             onClick={() => setView(current => (current === 'logs' ? 'sources' : 'logs'))}
@@ -262,7 +283,7 @@ export default function App() {
       </div>
 
       <div className="main">
-        <hr style={{ height: '1px', color: '#eee' }} />
+        <hr className="main-divider" />
         {view === 'logs' ? (
           <LogsPage />
         ) : selectedSource ? (
