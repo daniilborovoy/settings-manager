@@ -3,6 +3,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useModalClose } from '../lib/useModalClose'
 import { detectLang, formatEditorValue, getCodeMirrorExtensions, LANGS } from '../lib/codeEditor'
+import SecretGenerator from './SecretGenerator'
 
 export default function VariableValueEditorModal({ varKey, value, onSave, onClose }) {
   const [lang, setLang] = useState(() => detectLang(value))
@@ -46,6 +47,13 @@ export default function VariableValueEditorModal({ varKey, value, onSave, onClos
             <button className="btn-icon btn-icon-dark" onClick={handleFormat} type="button">
               Format
             </button>
+            <SecretGenerator
+              tone="dark"
+              onUse={value => {
+                setDraft(value)
+                setFormatError('')
+              }}
+            />
             <button className="btn-close" onClick={requestClose}>×</button>
           </div>
         </div>

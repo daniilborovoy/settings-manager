@@ -70,6 +70,17 @@ export default function VariableEditor({
     setEditing({ index: variables.length, isNew: true })
   }
 
+  function renderValue(v) {
+    if (!v.value) {
+      return (
+        <span className="var-value-placeholder">
+          {v.hidden ? '(hidden — open editor to set a value)' : '(empty)'}
+        </span>
+      )
+    }
+    return showValues ? v.value : '•'.repeat(Math.min(v.value.length, 60))
+  }
+
   function badgeList(v) {
     const badges = []
     if (v.variable_type === 'file') badges.push({ label: 'file', className: 'badge-file' })
@@ -173,13 +184,17 @@ export default function VariableEditor({
                   </span>
                 )}
               </div>
-              <input
-                type={showValues ? 'text' : 'password'}
-                className="var-value"
-                value={v.value}
-                onChange={e => updateAt(index, { value: e.target.value })}
-                placeholder={v.hidden ? '(hidden — set new value to replace)' : ''}
-              />
+              <button
+                type="button"
+                className="var-value var-value-display"
+                onClick={event => {
+                  event.stopPropagation()
+                  openEditor(index)
+                }}
+                title={isGitlab ? 'Edit variable' : 'Open in editor'}
+              >
+                {renderValue(v)}
+              </button>
               <button
                 className="btn-expand-var"
                 onClick={event => {

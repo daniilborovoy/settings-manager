@@ -3,6 +3,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useModalClose } from '../lib/useModalClose'
 import { detectLang, formatEditorValue, getCodeMirrorExtensions, LANGS } from '../lib/codeEditor'
+import SecretGenerator from './SecretGenerator'
 
 const TYPES = [
   { value: 'env_var', label: 'Variable' },
@@ -211,6 +212,7 @@ export default function EditGitlabVariableModal({ variable, isNew, onSave, onClo
                 >
                   Format
                 </button>
+                <SecretGenerator onUse={value => update({ value })} />
               </div>
             </div>
             {formatError && <div className="editor-format-error editor-format-error-light">{formatError}</div>}
