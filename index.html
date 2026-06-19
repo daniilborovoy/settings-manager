@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Settings Manager</title>
     <script>
-      // Apply the saved/system theme before first paint to avoid a flash.
+      // Apply the saved/system theme + design style before first paint to avoid a flash.
       (function () {
         try {
           var saved = localStorage.getItem('theme')
@@ -14,6 +14,12 @@
           document.documentElement.setAttribute('data-theme', theme)
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light')
+        }
+        try {
+          var comic = localStorage.getItem('comic-style') === 'on'
+          document.documentElement.setAttribute('data-comic', comic ? 'on' : 'off')
+        } catch (e) {
+          document.documentElement.setAttribute('data-comic', 'off')
         }
       })()
     </script>

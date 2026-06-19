@@ -70,17 +70,6 @@ export default function VariableEditor({
     setEditing({ index: variables.length, isNew: true })
   }
 
-  function renderValue(v) {
-    if (!v.value) {
-      return (
-        <span className="var-value-placeholder">
-          {v.hidden ? '(hidden — open editor to set a value)' : '(empty)'}
-        </span>
-      )
-    }
-    return showValues ? v.value : '•'.repeat(Math.min(v.value.length, 60))
-  }
-
   function badgeList(v) {
     const badges = []
     if (v.variable_type === 'file') badges.push({ label: 'file', className: 'badge-file' })
@@ -157,7 +146,7 @@ export default function VariableEditor({
       <div className="variables-table">
         <div className="table-header">
           <span>Key</span>
-          <span>Value</span>
+          <span />
           <span />
         </div>
         {filtered.length === 0 && (
@@ -168,12 +157,7 @@ export default function VariableEditor({
         {filtered.map(({ v, index }) => {
           const badges = isGitlab ? badgeList(v) : []
           return (
-            <div
-              key={v._clientId ?? index}
-              className="table-row"
-              onDoubleClick={() => openEditor(index)}
-              title="Double-click to open the editor"
-            >
+            <div key={v._clientId ?? index} className="table-row">
               <div className="var-key-cell">
                 <span className="var-key">{v.key || <em className="var-key-empty">(unnamed)</em>}</span>
                 {badges.length > 0 && (
@@ -184,17 +168,6 @@ export default function VariableEditor({
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                className="var-value var-value-display"
-                onClick={event => {
-                  event.stopPropagation()
-                  openEditor(index)
-                }}
-                title={isGitlab ? 'Edit variable' : 'Open in editor'}
-              >
-                {renderValue(v)}
-              </button>
               <button
                 className="btn-expand-var"
                 onClick={event => {

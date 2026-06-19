@@ -4,13 +4,14 @@ import AddProjectModal from './components/AddProjectModal'
 import ProjectList from './components/ProjectList'
 import VariableEditor from './components/VariableEditor'
 import LogsPage from './components/LogsPage'
+import SettingsPage from './components/SettingsPage'
 import UpdateTokenModal from './components/UpdateTokenModal'
 import * as api from './lib/api'
 import { subscribe } from './lib/logger'
 import { assignIds, stripIds, normalizeForType, normalizedForCompare } from './lib/variables'
 import type { Project, Source, Variable } from './types'
 
-type View = 'sources' | 'logs'
+type View = 'sources' | 'logs' | 'settings'
 type Theme = 'light' | 'dark'
 
 function getErrorMessage(error: unknown) {
@@ -19,6 +20,10 @@ function getErrorMessage(error: unknown) {
 
 function getInitialTheme(): Theme {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+}
+
+function getInitialComic(): boolean {
+  return document.documentElement.getAttribute('data-comic') === 'on'
 }
 
 function isAuthError(message: string) {
@@ -40,6 +45,7 @@ export default function App() {
   const [logErrorCount, setLogErrorCount] = useState(0)
   const [tokenPrompt, setTokenPrompt] = useState<{ source: Source, retry: () => Promise<void> } | null>(null)
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
+  const [comic, setComic] = useState<boolean>(getInitialComic)
 
   function toggleTheme() {
     setTheme(prev => {
@@ -47,6 +53,17 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', next)
       try {
         localStorage.setItem('theme', next)
+      } catch {}
+      return next
+    })
+  }
+
+  function toggleComic() {
+    setComic(prev => {
+      const next = !prev
+      document.documentElement.setAttribute('data-comic', next ? 'on' : 'off')
+      try {
+        localStorage.setItem('comic-style', next ? 'on' : 'off')
       } catch {}
       return next
     })
@@ -273,6 +290,12 @@ export default function App() {
             <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
           <button
+            className={`btn-logs ${view === 'settings' ? 'active' : ''}`}
+            onClick={() => setView(current => (current === 'settings' ? 'sources' : 'settings'))}
+          >
+            <span>⚙ Settings</span>
+          </button>
+          <button
             className={`btn-logs ${view === 'logs' ? 'active' : ''}`}
             onClick={() => setView(current => (current === 'logs' ? 'sources' : 'logs'))}
           >
@@ -286,6 +309,13 @@ export default function App() {
         <hr className="main-divider" />
         {view === 'logs' ? (
           <LogsPage />
+        ) : view === 'settings' ? (
+          <SettingsPage
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            comic={comic}
+            onToggleComic={toggleComic}
+          />
         ) : selectedSource ? (
           <VariableEditor
             source={selectedSource}
