@@ -6,11 +6,13 @@ import { CSS } from '@dnd-kit/utilities'
 const TYPE_LABELS = {
   lambda: 'λ Lambda',
   gitlab_cicd: '⎇ GitLab CI/CD',
+  secrets_manager: '🔑 Secrets Manager',
 }
 
 const TYPE_COLORS = {
   lambda: '#ff9900',
   gitlab_cicd: '#fc6d26',
+  secrets_manager: '#dd344c',
 }
 
 function projectDragId(projectId) {

@@ -1,85 +1,74 @@
+//! GitLab CI/CD project variables provider.
+//!
+//! Saving diffs the desired state against the live one: removed variables are
+//! deleted, the rest are created or updated. A variable's identity is the
+//! `(key, environment_scope)` pair.
+
 use std::collections::HashSet;
 
-use reqwest::StatusCode;
+use reqwest::Response;
 use serde_json::{json, Value};
 
-use super::{cfg_str, Variable};
+use super::{cfg_str, ProviderError, Variable};
 
-fn http_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
+const PER_PAGE: usize = 100;
+
+fn http_client() -> Result<reqwest::Client, ProviderError> {
+    // Self-hosted GitLab instances frequently run on self-signed certificates.
+    Ok(reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
-        .build()
-        .map_err(|e| e.to_string())
+        .build()?)
 }
 
-fn base_url(config: &Value) -> Result<String, String> {
+fn base_url(config: &Value) -> Result<String, ProviderError> {
     let gitlab_url = cfg_str(config, "gitlab_url")?.trim_end_matches('/');
     let project_id = cfg_str(config, "project_id")?;
     let encoded = urlencoding::encode(project_id);
     Ok(format!("{gitlab_url}/api/v4/projects/{encoded}/variables"))
 }
 
-fn extract_error(status: StatusCode, body: &str) -> String {
-    let parsed: Value = match serde_json::from_str(body) {
-        Ok(v) => v,
-        Err(_) => return format!("GitLab {status}: {body}"),
+/// Pulls a human-readable message out of a GitLab error body, which may be
+/// `{"message": "..."}`, `{"message": {field: [msgs]}}`, or `{"error": "..."}`.
+fn extract_error(body: &str) -> String {
+    let Ok(parsed) = serde_json::from_str::<Value>(body) else {
+        return body.to_string();
     };
     if let Some(msg) = parsed.get("message") {
         if let Some(s) = msg.as_str() {
-            return format!("GitLab {status}: {s}");
+            return s.to_string();
         }
-        // message may be an object mapping field → [messages]
         if let Some(obj) = msg.as_object() {
-            let parts: Vec<String> = obj
+            return obj
                 .iter()
-                .map(|(k, v)| match v {
+                .map(|(field, messages)| match messages {
                     Value::Array(arr) => format!(
-                        "{k}: {}",
+                        "{field}: {}",
                         arr.iter()
-                            .filter_map(|x| x.as_str())
+                            .filter_map(Value::as_str)
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
-                    other => format!("{k}: {other}"),
+                    other => format!("{field}: {other}"),
                 })
-                .collect();
-            return format!("GitLab {status}: {}", parts.join("; "));
+                .collect::<Vec<_>>()
+                .join("; ");
         }
-        return format!("GitLab {status}: {msg}");
+        return msg.to_string();
     }
-    if let Some(err) = parsed.get("error").and_then(|v| v.as_str()) {
-        return format!("GitLab {status}: {err}");
+    if let Some(err) = parsed.get("error").and_then(Value::as_str) {
+        return err.to_string();
     }
-    format!("GitLab {status}: {body}")
+    body.to_string()
 }
 
-fn parse_variable(v: &Value) -> Option<Variable> {
-    let key = v.get("key")?.as_str()?.to_string();
-    let value = v
-        .get("value")
-        .and_then(|x| x.as_str())
-        .unwrap_or("")
-        .to_string();
-    Some(Variable {
-        key,
-        value,
-        variable_type: v
-            .get("variable_type")
-            .and_then(|x| x.as_str())
-            .map(String::from),
-        environment_scope: v
-            .get("environment_scope")
-            .and_then(|x| x.as_str())
-            .map(String::from),
-        protected: v.get("protected").and_then(|x| x.as_bool()),
-        masked: v.get("masked").and_then(|x| x.as_bool()),
-        hidden: v.get("hidden").and_then(|x| x.as_bool()),
-        raw: v.get("raw").and_then(|x| x.as_bool()),
-        description: v
-            .get("description")
-            .and_then(|x| x.as_str())
-            .map(String::from),
-    })
+async fn error_from_response(resp: Response, context: Option<String>) -> ProviderError {
+    let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+    let mut message = extract_error(&body);
+    if let Some(context) = context {
+        message.push_str(&format!(" ({context})"));
+    }
+    ProviderError::Gitlab { status, message }
 }
 
 fn variable_to_body(v: &Variable) -> Value {
@@ -99,6 +88,8 @@ fn variable_to_body(v: &Variable) -> Value {
         obj.insert("masked".into(), json!(m));
     }
     if let Some(h) = v.hidden {
+        // The API field for creating a hidden variable is `masked_and_hidden`,
+        // while reads report it back as `hidden`.
         obj.insert("masked_and_hidden".into(), json!(h));
     }
     if let Some(r) = v.raw {
@@ -110,18 +101,14 @@ fn variable_to_body(v: &Variable) -> Value {
     Value::Object(obj)
 }
 
-type Identity = (String, String);
-
-fn identity(v: &Variable) -> Identity {
+fn identity(v: &Variable) -> (&str, &str) {
     (
-        v.key.clone(),
-        v.environment_scope
-            .clone()
-            .unwrap_or_else(|| "*".to_string()),
+        v.key.as_str(),
+        v.environment_scope.as_deref().unwrap_or("*"),
     )
 }
 
-pub async fn get_variables(config: &Value) -> Result<Vec<Variable>, String> {
+pub async fn get_variables(config: &Value) -> Result<Vec<Variable>, ProviderError> {
     let client = http_client()?;
     let url = base_url(config)?;
     let token = cfg_str(config, "private_token")?;
@@ -132,28 +119,18 @@ pub async fn get_variables(config: &Value) -> Result<Vec<Variable>, String> {
         let resp = client
             .get(&url)
             .header("PRIVATE-TOKEN", token)
-            .query(&[("per_page", "100".to_string()), ("page", page.to_string())])
+            .query(&[("per_page", PER_PAGE.to_string()), ("page", page.to_string())])
             .send()
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
 
-        let status = resp.status();
-        if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            return Err(extract_error(status, &body));
+        if !resp.status().is_success() {
+            return Err(error_from_response(resp, None).await);
         }
 
-        let data: Vec<Value> = resp.json().await.map_err(|e| e.to_string())?;
-        if data.is_empty() {
-            break;
-        }
-        let len = data.len();
-        for v in &data {
-            if let Some(var) = parse_variable(v) {
-                out.push(var);
-            }
-        }
-        if len < 100 {
+        let data: Vec<Variable> = resp.json().await?;
+        let page_len = data.len();
+        out.extend(data);
+        if page_len < PER_PAGE {
             break;
         }
         page += 1;
@@ -161,89 +138,108 @@ pub async fn get_variables(config: &Value) -> Result<Vec<Variable>, String> {
     Ok(out)
 }
 
-pub async fn save_variables(config: &Value, new_vars: &[Variable]) -> Result<(), String> {
+pub async fn save_variables(config: &Value, new_vars: &[Variable]) -> Result<(), ProviderError> {
     let client = http_client()?;
     let url = base_url(config)?;
     let token = cfg_str(config, "private_token")?;
 
     let existing = get_variables(config).await?;
-    let existing_set: HashSet<Identity> = existing.iter().map(identity).collect();
-    let new_set: HashSet<Identity> = new_vars.iter().map(identity).collect();
+    let existing_set: HashSet<(&str, &str)> = existing.iter().map(identity).collect();
+    let new_set: HashSet<(&str, &str)> = new_vars.iter().map(identity).collect();
 
-    // Delete removed
     for old in &existing {
-        let id = identity(old);
-        if new_set.contains(&id) {
+        if new_set.contains(&identity(old)) {
             continue;
         }
-        let del_url = format!("{url}/{}", urlencoding::encode(&old.key));
-        let scope = old
-            .environment_scope
-            .clone()
-            .unwrap_or_else(|| "*".to_string());
+        let (key, scope) = identity(old);
+        let del_url = format!("{url}/{}", urlencoding::encode(key));
         let resp = client
             .delete(&del_url)
             .header("PRIVATE-TOKEN", token)
-            .query(&[("filter[environment_scope]", &scope)])
+            .query(&[("filter[environment_scope]", scope)])
             .send()
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
         if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(format!(
-                "{} {}",
-                extract_error(status, &body),
-                format!("(while deleting {}:{})", old.key, scope)
-            ));
+            return Err(
+                error_from_response(resp, Some(format!("while deleting {key}:{scope}"))).await,
+            );
         }
     }
 
-    // Create or update
     for new_var in new_vars {
-        let id = identity(new_var);
+        let (key, scope) = identity(new_var);
         let body = variable_to_body(new_var);
-        let (resp, action) = if existing_set.contains(&id) {
-            let put_url = format!("{url}/{}", urlencoding::encode(&new_var.key));
-            let scope = new_var
-                .environment_scope
-                .clone()
-                .unwrap_or_else(|| "*".to_string());
-            (
-                client
-                    .put(&put_url)
-                    .header("PRIVATE-TOKEN", token)
-                    .query(&[("filter[environment_scope]", &scope)])
-                    .json(&body)
-                    .send()
-                    .await
-                    .map_err(|e| e.to_string())?,
-                "updating",
-            )
+        let (resp, action) = if existing_set.contains(&(key, scope)) {
+            let put_url = format!("{url}/{}", urlencoding::encode(key));
+            let resp = client
+                .put(&put_url)
+                .header("PRIVATE-TOKEN", token)
+                .query(&[("filter[environment_scope]", scope)])
+                .json(&body)
+                .send()
+                .await?;
+            (resp, "updating")
         } else {
-            (
-                client
-                    .post(&url)
-                    .header("PRIVATE-TOKEN", token)
-                    .json(&body)
-                    .send()
-                    .await
-                    .map_err(|e| e.to_string())?,
-                "creating",
-            )
+            let resp = client
+                .post(&url)
+                .header("PRIVATE-TOKEN", token)
+                .json(&body)
+                .send()
+                .await?;
+            (resp, "creating")
         };
 
         if !resp.status().is_success() {
-            let status = resp.status();
-            let error_body = resp.text().await.unwrap_or_default();
-            return Err(format!(
-                "{} (while {action} {}:{})",
-                extract_error(status, &error_body),
-                new_var.key,
-                new_var.environment_scope.as_deref().unwrap_or("*")
-            ));
+            return Err(
+                error_from_response(resp, Some(format!("while {action} {key}:{scope}"))).await,
+            );
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod extract_error {
+        use super::*;
+
+        #[test]
+        fn returns_plain_string_message() {
+            assert_eq!(
+                extract_error(r#"{"message":"401 Unauthorized"}"#),
+                "401 Unauthorized"
+            );
+        }
+
+        #[test]
+        fn joins_field_error_object() {
+            assert_eq!(
+                extract_error(r#"{"message":{"value":["is invalid","is too short"]}}"#),
+                "value: is invalid, is too short"
+            );
+        }
+
+        #[test]
+        fn returns_error_field_when_no_message() {
+            assert_eq!(extract_error(r#"{"error":"invalid_token"}"#), "invalid_token");
+        }
+
+        #[test]
+        fn falls_back_to_raw_body_when_not_json() {
+            assert_eq!(extract_error("<html>boom</html>"), "<html>boom</html>");
+        }
+    }
+
+    mod identity {
+        use super::*;
+
+        #[test]
+        fn defaults_missing_scope_to_wildcard() {
+            let v = Variable::kv("KEY".into(), "v".into());
+            assert_eq!(identity(&v), ("KEY", "*"));
+        }
+    }
 }

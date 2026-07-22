@@ -1,4 +1,4 @@
-export type SourceType = 'lambda' | 'gitlab_cicd'
+export type SourceType = 'lambda' | 'gitlab_cicd' | 'secrets_manager'
 
 export type SourceConfig = Record<string, string>
 

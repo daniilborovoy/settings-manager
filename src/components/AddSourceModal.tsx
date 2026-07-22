@@ -4,12 +4,19 @@ import type { Source, SourceConfig, SourceType } from '../types'
 
 const SOURCE_TYPES: Array<{ value: SourceType, label: string }> = [
   { value: 'lambda', label: 'AWS Lambda' },
+  { value: 'secrets_manager', label: 'AWS Secrets Manager' },
   { value: 'gitlab_cicd', label: 'GitLab CI/CD' },
 ]
 
 const FIELDS: Record<SourceType, Array<{ key: string, label: string, placeholder: string, type?: string }>> = {
   lambda: [
     { key: 'function_name', label: 'Function Name', placeholder: 'your-function-name' },
+    { key: 'aws_region', label: 'AWS Region', placeholder: 'eu-west-1' },
+    { key: 'aws_access_key_id', label: 'AWS Access Key ID', placeholder: 'AKIAIOSFODNN7EXAMPLE' },
+    { key: 'aws_secret_access_key', label: 'AWS Secret Access Key', type: 'password', placeholder: '••••••••' },
+  ],
+  secrets_manager: [
+    { key: 'secret_name', label: 'Secret Name or ARN', placeholder: 'my-app/prod' },
     { key: 'aws_region', label: 'AWS Region', placeholder: 'eu-west-1' },
     { key: 'aws_access_key_id', label: 'AWS Access Key ID', placeholder: 'AKIAIOSFODNN7EXAMPLE' },
     { key: 'aws_secret_access_key', label: 'AWS Secret Access Key', type: 'password', placeholder: '••••••••' },

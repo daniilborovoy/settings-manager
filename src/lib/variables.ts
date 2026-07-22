@@ -48,7 +48,7 @@ export function normalizeForType(vars: Variable[], targetType: SourceType) {
     }))
   }
 
-  if (targetType === 'lambda') {
+  if (targetType === 'lambda' || targetType === 'secrets_manager') {
     return vars.map(variable => newLambdaVariable({ key: variable.key, value: variable.value }))
   }
 

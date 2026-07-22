@@ -2,6 +2,7 @@
 
 mod commands;
 mod db;
+mod error;
 mod providers;
 
 use std::sync::Mutex;
@@ -35,13 +36,9 @@ fn main() {
 
     tauri::Builder::default()
         .setup(|app| {
-            let app_dir = app
-                .path()
-                .app_data_dir()
-                .expect("failed to resolve app data dir");
-            std::fs::create_dir_all(&app_dir).expect("failed to create app data dir");
-            let db_path = app_dir.join("settings_manager.db");
-            let conn = db::open(&db_path).expect("failed to open sqlite db");
+            let app_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&app_dir)?;
+            let conn = db::open(&app_dir.join("settings_manager.db"))?;
             app.manage(AppState {
                 db: Mutex::new(conn),
             });

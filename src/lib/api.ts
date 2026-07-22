@@ -18,6 +18,12 @@ function getErrorMessage(error: unknown) {
 async function call<T>(command: string, args: InvokeArgs = {}): Promise<T> {
   const start = Date.now()
 
+  if (!('__TAURI_INTERNALS__' in window)) {
+    throw new Error(
+      'Tauri runtime not found: open the app via "yarn tauri:dev" or the built app, not the browser'
+    )
+  }
+
   try {
     const result = await invoke<T>(command, args)
     addLog({ command, args, ok: true, duration: Date.now() - start, result })
