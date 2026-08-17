@@ -21,6 +21,9 @@ final class AppStore {
     var selectedSourceID: Int64?
     var variables: [Variable] = []
     var originalVariables: [Variable] = []
+    /// Detected payload format of the fetched secret (Secrets Manager only);
+    /// passed back on save so the secret keeps its format.
+    var secretFormat: SecretFormat?
     var view: MainView = .sources
     var loadingVars = false
     var saving = false
@@ -314,12 +317,13 @@ final class AppStore {
 
         // Throws on failure so the token sheet's retry can surface a repeated 401.
         let load: @MainActor () async throws -> Void = { [self] in
-            let vars = try await logged("get_variables", args: ["id": "\(sourceID)"]) {
+            let result = try await logged("get_variables", args: ["id": "\(sourceID)"]) {
                 let (type, config) = try db.sourceConfig(id: sourceID)
                 return try await Providers.getVariables(type: type, config: config)
             }
-            variables = vars
-            originalVariables = vars
+            variables = result.variables
+            originalVariables = result.variables
+            secretFormat = result.secretFormat
         }
 
         do {
@@ -343,7 +347,9 @@ final class AppStore {
             let toSave = variables
             try await logged("save_variables", args: ["id": "\(source.id)", "count": "\(toSave.count)"]) {
                 let (type, config) = try db.sourceConfig(id: source.id)
-                try await Providers.saveVariables(type: type, config: config, variables: toSave)
+                try await Providers.saveVariables(
+                    type: type, config: config, variables: toSave, secretFormat: secretFormat
+                )
             }
             originalVariables = toSave
             saveSuccess = true
@@ -385,11 +391,11 @@ final class AppStore {
     func copyFrom(sourceID: Int64) async {
         guard let target = selectedSource else { return }
         do {
-            let vars = try await logged("get_variables", args: ["id": "\(sourceID)"]) {
+            let result = try await logged("get_variables", args: ["id": "\(sourceID)"]) {
                 let (type, config) = try db.sourceConfig(id: sourceID)
                 return try await Providers.getVariables(type: type, config: config)
             }
-            variables = vars.normalized(for: target.type)
+            variables = result.variables.normalized(for: target.type)
         } catch {
             self.error = message(of: error)
         }

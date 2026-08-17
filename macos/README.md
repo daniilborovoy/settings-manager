@@ -31,6 +31,10 @@ builds can coexist on the same data. The Swift build adds one extra table,
 it. Sources always keep an inline copy of their credentials in `config`, so
 saved keys are a convenience layer, not a dependency.
 
+Secrets Manager payloads may be a JSON object, TOML, YAML mapping, dotenv
+lines, or plain text — the format is detected on fetch and the secret is
+written back in the same format on save. (The Tauri build supports JSON only.)
+
 ## Layout
 
 | Swift | Ports |
