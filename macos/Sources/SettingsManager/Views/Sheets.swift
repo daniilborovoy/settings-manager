@@ -63,6 +63,28 @@ private struct SourceField {
     }
 }
 
+/// "Use saved key" menu that merges a stored credential into the config form.
+struct SavedKeyMenu: View {
+    @Environment(AppStore.self) private var store
+    let kind: CredentialKind
+    @Binding var config: [String: String]
+
+    var body: some View {
+        let saved = store.credentials.filter { $0.kind == kind }
+        if !saved.isEmpty {
+            LabeledContent("Credentials") {
+                Menu("Use saved key...") {
+                    ForEach(saved) { cred in
+                        Button("\(cred.name) (\(cred.hint))") {
+                            config.merge(cred.data) { _, new in new }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private func fields(for type: SourceType) -> [SourceField] {
     switch type {
     case .lambda: [
@@ -118,6 +140,7 @@ struct AddSourceSheet: View {
                 .labelsHidden()
                 .onChange(of: type) { _, _ in config = [:] }
             }
+            SavedKeyMenu(kind: .kind(for: type), config: $config)
             ForEach(fields(for: type), id: \.key) { field in
                 LabeledContent(field.label) {
                     let binding = Binding(
@@ -193,6 +216,7 @@ struct EditSourceSheet: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
+            SavedKeyMenu(kind: .kind(for: source.type), config: $config)
             ForEach(fields(for: source.type), id: \.key) { field in
                 LabeledContent(field.label) {
                     let binding = Binding(

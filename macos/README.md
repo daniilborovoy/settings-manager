@@ -26,7 +26,10 @@ to distribute it.
 Opens the same database the Tauri build uses on macOS:
 `~/Library/Application Support/com.settings-manager.app/settings_manager.db`.
 Schema and migrations are ported 1:1 from `src-tauri/src/db.rs`, so both
-builds can coexist on the same data.
+builds can coexist on the same data. The Swift build adds one extra table,
+`credentials` (saved API keys, managed in Settings); the Tauri build ignores
+it. Sources always keep an inline copy of their credentials in `config`, so
+saved keys are a convenience layer, not a dependency.
 
 ## Layout
 

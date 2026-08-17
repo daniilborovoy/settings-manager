@@ -15,6 +15,7 @@ final class AppStore {
     enum MainView { case sources, logs, settings }
 
     var projects: [Project] = []
+    var credentials: [SavedCredential] = []
     // Selection reactions run via .onChange in ContentView (didSet is not
     // reliable through a Bindable List(selection:) binding).
     var selectedSourceID: Int64?
@@ -62,6 +63,7 @@ final class AppStore {
             self.error = (error as? AppError)?.errorDescription ?? error.localizedDescription
         }
         loadProjects()
+        loadCredentials()
     }
 
     // ── Logged call wrapper (port of api.ts `call`) ──
@@ -182,6 +184,7 @@ final class AppStore {
         _ = try await logged("create_source", args: args) {
             try db.createSource(projectID: projectID, name: name, type: type, config: config)
         }
+        rememberCredentials(type: type, config: config, name: name)
         loadProjects()
     }
 
@@ -215,6 +218,9 @@ final class AppStore {
         _ = try await logged("update_source_config", args: args) {
             try db.updateSourceConfig(id: id, config: config)
         }
+        if let source = projects.lazy.flatMap(\.sources).first(where: { $0.id == id }) {
+            rememberCredentials(type: source.type, config: config, name: source.name)
+        }
         if selectedSourceID == id { refresh() }
     }
 
@@ -232,6 +238,55 @@ final class AppStore {
                 projects = previous
             }
         }
+    }
+
+    // ── Saved credentials ──
+
+    func loadCredentials() {
+        credentials = (try? db.listCredentials()) ?? []
+    }
+
+    func createCredential(name: String, kind: CredentialKind, data: [String: String]) async throws {
+        var args = redacted(data)
+        args["name"] = name
+        args["kind"] = kind.rawValue
+        _ = try await logged("create_credential", args: args) {
+            try db.createCredential(name: name, kind: kind, data: data)
+        }
+        loadCredentials()
+    }
+
+    func updateCredential(id: Int64, name: String, data: [String: String]) async throws {
+        var args = redacted(data)
+        args["id"] = "\(id)"
+        args["name"] = name
+        _ = try await logged("update_credential", args: args) {
+            try db.updateCredential(id: id, name: name, data: data)
+        }
+        loadCredentials()
+    }
+
+    func deleteCredential(id: Int64) {
+        Task {
+            try? await logged("delete_credential", args: ["id": "\(id)"]) {
+                try db.deleteCredential(id: id)
+            }
+            loadCredentials()
+        }
+    }
+
+    /// Silently saves credentials typed into a source form, so they show up in
+    /// Settings and can be reused. Skips exact duplicates.
+    private func rememberCredentials(type: SourceType, config: [String: String], name: String) {
+        let kind = CredentialKind.kind(for: type)
+        var data: [String: String] = [:]
+        for field in kind.fields {
+            guard let value = config[field], !value.isEmpty else { return }
+            data[field] = value
+        }
+        guard !credentials.contains(where: { $0.kind == kind && $0.data == data }) else { return }
+        _ = try? db.createCredential(name: name, kind: kind, data: data)
+        loadCredentials()
     }
 
     // ── Variables ──

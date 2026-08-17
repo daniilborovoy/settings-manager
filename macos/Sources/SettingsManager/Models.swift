@@ -24,6 +24,40 @@ enum SourceType: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A reusable credential saved in the local DB. Sources still keep their own
+/// inline copy in `config` (Tauri compatibility), so deleting a saved
+/// credential never breaks a source.
+enum CredentialKind: String, CaseIterable, Identifiable {
+    case aws
+    case gitlab
+
+    var id: String { rawValue }
+    var label: String { self == .aws ? "AWS" : "GitLab" }
+
+    /// Source-config field names this credential fills.
+    var fields: [String] {
+        self == .aws ? ["aws_access_key_id", "aws_secret_access_key"] : ["private_token"]
+    }
+
+    static func kind(for type: SourceType) -> CredentialKind {
+        type == .gitlabCICD ? .gitlab : .aws
+    }
+}
+
+struct SavedCredential: Identifiable, Hashable {
+    let id: Int64
+    var name: String
+    var kind: CredentialKind
+    /// Keyed by source-config field names, so filling a form is a plain merge.
+    var data: [String: String]
+
+    /// Non-secret identifier shown in lists (access key ID for AWS; nothing
+    /// secret for GitLab tokens).
+    var hint: String {
+        kind == .aws ? (data["aws_access_key_id"] ?? "") : "private token"
+    }
+}
+
 struct Source: Identifiable, Hashable {
     let id: Int64
     var projectID: Int64

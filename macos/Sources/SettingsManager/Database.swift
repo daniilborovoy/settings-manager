@@ -131,6 +131,16 @@ final class Database {
         if try !columnExists("sources", "sort_order") {
             try exec("ALTER TABLE sources ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         }
+        // Swift-app-only table; the Tauri build ignores it.
+        try exec("""
+            CREATE TABLE IF NOT EXISTS credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                data TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """)
         try backfillDefaultProject()
         try backfillSortOrders()
     }
@@ -285,6 +295,44 @@ final class Database {
     func deleteSource(id: Int64) throws {
         guard try run("DELETE FROM sources WHERE id = ?", [id]) > 0 else {
             throw AppError.notFound("Source")
+        }
+    }
+
+    // ── Saved credentials ──
+
+    func listCredentials() throws -> [SavedCredential] {
+        try rows("SELECT id, name, kind, data FROM credentials ORDER BY name, id") {
+            (id: sqlite3_column_int64($0, 0), name: self.text($0, 1), kind: self.text($0, 2), data: self.text($0, 3))
+        }.compactMap { row in
+            guard let kind = CredentialKind(rawValue: row.kind),
+                  let bytes = row.data.data(using: .utf8),
+                  let data = try? JSONDecoder().decode([String: String].self, from: bytes) else { return nil }
+            return SavedCredential(id: row.id, name: row.name, kind: kind, data: data)
+        }
+    }
+
+    func createCredential(name: String, kind: CredentialKind, data: [String: String]) throws -> Int64 {
+        let json = try JSONEncoder().encode(data)
+        try run(
+            "INSERT INTO credentials (name, kind, data, created_at) VALUES (?, ?, ?, ?)",
+            [name, kind.rawValue, String(decoding: json, as: UTF8.self), now()]
+        )
+        return sqlite3_last_insert_rowid(db)
+    }
+
+    func updateCredential(id: Int64, name: String, data: [String: String]) throws {
+        let json = try JSONEncoder().encode(data)
+        guard try run(
+            "UPDATE credentials SET name = ?, data = ? WHERE id = ?",
+            [name, String(decoding: json, as: UTF8.self), id]
+        ) > 0 else {
+            throw AppError.notFound("Credential")
+        }
+    }
+
+    func deleteCredential(id: Int64) throws {
+        guard try run("DELETE FROM credentials WHERE id = ?", [id]) > 0 else {
+            throw AppError.notFound("Credential")
         }
     }
 

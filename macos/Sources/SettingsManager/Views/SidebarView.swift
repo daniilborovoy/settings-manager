@@ -39,14 +39,18 @@ struct SidebarView: View {
 
     var body: some View {
         @Bindable var store = store
+        // Finder-style: sections with non-selectable gray headers, single-line
+        // icon+name rows. Sections also avoid the id collision DisclosureGroup
+        // rows had with the Int64 source selection.
         List(selection: $store.selectedSourceID) {
             if store.projects.isEmpty {
                 Text("No projects yet.\nClick + to get started.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
+                    .selectionDisabled()
             }
             ForEach(store.projects) { project in
-                DisclosureGroup(isExpanded: expansionBinding(project.id)) {
+                Section(isExpanded: expansionBinding(project.id)) {
                     ForEach(project.sources) { source in
                         sourceRow(source)
                     }
@@ -57,16 +61,13 @@ struct SidebarView: View {
                         store.addSourceProject = project
                     } label: {
                         Label("Add Source", systemImage: "plus")
-                            .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                } label: {
-                    projectRow(project)
+                    .selectionDisabled()
+                } header: {
+                    projectHeader(project)
                 }
-            }
-            .onMove { from, to in
-                store.moveProjects(from: from, to: to)
             }
         }
         .listStyle(.sidebar)
@@ -118,32 +119,34 @@ struct SidebarView: View {
         )
     }
 
-    private func projectRow(_ project: Project) -> some View {
-        HStack {
-            Text(project.name)
-                .fontWeight(.medium)
-            Spacer()
-            Text("\(project.sources.count)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 1)
-                .background(.quaternary, in: Capsule())
-        }
-        .contextMenu {
-            Button("Rename") { startRename(.project(project)) }
-            Button("Add Source") { store.addSourceProject = project }
-            Divider()
-            Button("Delete", role: .destructive) { deleteTarget = .project(project) }
-        }
+    private func projectHeader(_ project: Project) -> some View {
+        Text(project.name)
+            .contextMenu {
+                Button("Rename") { startRename(.project(project)) }
+                Button("Add Source") { store.addSourceProject = project }
+                Divider()
+                // Sections can't drag-reorder; Finder look wins over drag.
+                Button("Move Up") { moveProject(project, by: -1) }
+                    .disabled(store.projects.first?.id == project.id)
+                Button("Move Down") { moveProject(project, by: 1) }
+                    .disabled(store.projects.last?.id == project.id)
+                Divider()
+                Button("Delete", role: .destructive) { deleteTarget = .project(project) }
+            }
+    }
+
+    private func moveProject(_ project: Project, by offset: Int) {
+        guard let index = store.projects.firstIndex(where: { $0.id == project.id }),
+              (0..<store.projects.count).contains(index + offset) else { return }
+        store.moveProjects(from: IndexSet(integer: index), to: offset < 0 ? index - 1 : index + 2)
     }
 
     private func sourceRow(_ source: Source) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(source.type.badge)
-                .font(.caption2)
-                .foregroundStyle(color(for: source.type))
+        Label {
             Text(source.name)
+        } icon: {
+            Image(systemName: icon(for: source.type))
+                .foregroundStyle(color(for: source.type))
         }
         .tag(source.id)
         .contextMenu {
@@ -151,6 +154,14 @@ struct SidebarView: View {
             Button("Edit Configuration...") { store.editSource = source }
             Divider()
             Button("Delete", role: .destructive) { deleteTarget = .source(source) }
+        }
+    }
+
+    private func icon(for type: SourceType) -> String {
+        switch type {
+        case .lambda: "bolt"
+        case .gitlabCICD: "arrow.triangle.branch"
+        case .secretsManager: "key"
         }
     }
 
