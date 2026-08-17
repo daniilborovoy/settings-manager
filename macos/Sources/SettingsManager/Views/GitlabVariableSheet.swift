@@ -39,64 +39,35 @@ struct GitlabVariableSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text(isNew ? "Add variable" : "Edit variable")
+                .font(.title3.bold())
+
+            HStack(alignment: .top, spacing: 16) {
+                editorColumn
+                Divider()
+                paramsColumn
+                    .frame(width: 340)
+            }
+
             HStack {
-                Text(isNew ? "Add variable" : "Edit variable")
-                    .font(.title3.bold())
                 Spacer()
-            }
-
-            HStack(spacing: 16) {
-                Picker("Type", selection: Binding(
-                    get: { draft.variableType ?? "env_var" },
-                    set: { draft.variableType = $0 }
-                )) {
-                    Text("Variable").tag("env_var")
-                    Text("File").tag("file")
+                Button("Cancel") { dismiss() }
+                Button(isNew ? "Add variable" : "Save changes") {
+                    onSave(draft)
+                    dismiss()
                 }
-                .frame(maxWidth: 220)
-
-                TextField("Environment scope", text: Binding(
-                    get: { draft.environmentScope ?? "*" },
-                    set: { draft.environmentScope = $0 }
-                ), prompt: Text("* (All)"))
-                .textFieldStyle(.roundedBorder)
+                .buttonStyle(.borderedProminent)
+                .disabled(draft.key.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+        }
+        .padding(20)
+        .frame(width: 1000, height: 640)
+    }
 
-            Picker("Visibility", selection: Binding(get: { visibility }, set: setVisibility)) {
-                Text("Visible — can be seen in job logs").tag(Visibility.visible)
-                Text("Masked — masked in job logs, can be revealed in CI/CD settings").tag(Visibility.masked)
-                Text(isNew
-                     ? "Masked and hidden — can never be revealed again"
-                     : "Masked and hidden — only configurable when creating a new variable")
-                    .tag(Visibility.maskedHidden)
-            }
-            .pickerStyle(.radioGroup)
-            // The masked+hidden option is create-only in the GitLab API.
-            .onChange(of: visibility) { _, next in
-                if next == .maskedHidden && !isNew { setVisibility(.masked) }
-            }
+    // ── Left: value editor ──
 
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle("Protect variable — export only to pipelines on protected branches and tags", isOn: Binding(
-                    get: { draft.protected ?? false },
-                    set: { draft.protected = $0 }
-                ))
-                Toggle("Expand variable reference — $ starts a reference to another variable", isOn: Binding(
-                    get: { !(draft.raw ?? false) },
-                    set: { draft.raw = !$0 }
-                ))
-            }
-
-            TextField("Description (optional)", text: Binding(
-                get: { draft.description ?? "" },
-                set: { draft.description = $0.isEmpty ? nil : $0 }
-            ), prompt: Text("The description of the variable's value or usage."))
-            .textFieldStyle(.roundedBorder)
-
-            TextField("Key", text: $draft.key, prompt: Text("VARIABLE_KEY"))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(.body, design: .monospaced))
-
+    private var editorColumn: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Value")
                 Spacer()
@@ -124,21 +95,77 @@ struct GitlabVariableSheet: View {
                 get: { draft.value },
                 set: { draft.value = $0; if !formatError.isEmpty { formatError = "" } }
             ), lang: lang)
-            .frame(minHeight: 160)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(.quaternary))
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button(isNew ? "Add variable" : "Save changes") {
-                    onSave(draft)
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(draft.key.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
         }
-        .padding(20)
-        .frame(width: 620, height: 640)
+        .frame(maxWidth: .infinity)
+    }
+
+    // ── Right: parameters ──
+
+    private var paramsColumn: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Key", text: $draft.key, prompt: Text("VARIABLE_KEY"))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+
+            LabeledContent("Type") {
+                Picker("", selection: Binding(
+                    get: { draft.variableType ?? "env_var" },
+                    set: { draft.variableType = $0 }
+                )) {
+                    Text("Variable").tag("env_var")
+                    Text("File").tag("file")
+                }
+                .labelsHidden()
+            }
+
+            LabeledContent("Scope") {
+                TextField("", text: Binding(
+                    get: { draft.environmentScope ?? "*" },
+                    set: { draft.environmentScope = $0 }
+                ), prompt: Text("* (All)"))
+                .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Visibility")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Picker("", selection: Binding(get: { visibility }, set: setVisibility)) {
+                    Text("Visible in job logs").tag(Visibility.visible)
+                    Text("Masked in job logs").tag(Visibility.masked)
+                    Text(isNew
+                         ? "Masked and hidden — can never be revealed again"
+                         : "Masked and hidden (create-only)")
+                        .tag(Visibility.maskedHidden)
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                // The masked+hidden option is create-only in the GitLab API.
+                .onChange(of: visibility) { _, next in
+                    if next == .maskedHidden && !isNew { setVisibility(.masked) }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("Protect variable — export only to pipelines on protected branches and tags", isOn: Binding(
+                    get: { draft.protected ?? false },
+                    set: { draft.protected = $0 }
+                ))
+                Toggle("Expand variable reference — $ starts a reference to another variable", isOn: Binding(
+                    get: { !(draft.raw ?? false) },
+                    set: { draft.raw = !$0 }
+                ))
+            }
+
+            TextField("Description (optional)", text: Binding(
+                get: { draft.description ?? "" },
+                set: { draft.description = $0.isEmpty ? nil : $0 }
+            ), prompt: Text("The description of the variable's value or usage."), axis: .vertical)
+            .textFieldStyle(.roundedBorder)
+            .lineLimit(2...4)
+
+            Spacer(minLength: 0)
+        }
     }
 }
