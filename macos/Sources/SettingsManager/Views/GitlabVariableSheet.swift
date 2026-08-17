@@ -106,7 +106,7 @@ struct GitlabVariableSheet: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 140)
+                .frame(width: 260)
                 Button("Format") {
                     do {
                         draft.value = try CodeFormat.format(draft.value, lang: lang)
@@ -120,11 +120,10 @@ struct GitlabVariableSheet: View {
             if !formatError.isEmpty {
                 Text(formatError).foregroundStyle(.red).font(.callout)
             }
-            TextEditor(text: Binding(
+            CodeEditor(text: Binding(
                 get: { draft.value },
                 set: { draft.value = $0; if !formatError.isEmpty { formatError = "" } }
-            ))
-            .font(.system(size: 13, design: .monospaced))
+            ), lang: lang)
             .frame(minHeight: 160)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(.quaternary))
 

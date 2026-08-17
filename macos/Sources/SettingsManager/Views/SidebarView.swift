@@ -148,6 +148,7 @@ struct SidebarView: View {
         .tag(source.id)
         .contextMenu {
             Button("Rename") { startRename(.source(source)) }
+            Button("Edit Configuration...") { store.editSource = source }
             Divider()
             Button("Delete", role: .destructive) { deleteTarget = .source(source) }
         }
@@ -193,6 +194,7 @@ struct SidebarView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
         .background(store.view == view ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
+        .animation(.easeInOut(duration: 0.12), value: store.view)
         .padding(.horizontal, 6)
     }
 

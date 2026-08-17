@@ -7,7 +7,6 @@ export default function VariableEditor({
   source, sources, variables, onChange, onSave, onRefresh, onCopyFrom,
   loading, saving, isDirty, error, saveSuccess,
 }) {
-  const [showValues, setShowValues] = useState(false)
   const [search, setSearch] = useState('')
   const [newKey, setNewKey] = useState('')
   const [newValue, setNewValue] = useState('')
@@ -138,9 +137,6 @@ export default function VariableEditor({
             ))}
           </select>
         )}
-        <button className="btn-secondary" onClick={() => setShowValues(v => !v)}>
-          {showValues ? 'Hide Values' : 'Show Values'}
-        </button>
       </div>
 
       <div className="variables-table">
@@ -214,7 +210,7 @@ export default function VariableEditor({
             onKeyDown={e => e.key === 'Enter' && handleQuickAdd()}
           />
           <input
-            type={showValues ? 'text' : 'password'}
+            type="text"
             className="add-value"
             placeholder="value"
             value={newValue}

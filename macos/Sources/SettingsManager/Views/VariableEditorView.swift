@@ -9,7 +9,6 @@ private struct EditingTarget: Identifiable {
 struct VariableEditorView: View {
     @Environment(AppStore.self) private var store
     @State private var search = ""
-    @State private var showValues = false
     @State private var newKey = ""
     @State private var newValue = ""
     @State private var copyingFrom = false
@@ -26,16 +25,19 @@ struct VariableEditorView: View {
     }
 
     var body: some View {
-        if store.loadingVars {
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Loading variables...")
-                    .foregroundStyle(.secondary)
+        Group {
+            if store.loadingVars {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Loading variables...")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let source {
+                editor(source)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let source {
-            editor(source)
         }
+        .animation(.easeInOut(duration: 0.15), value: store.loadingVars)
     }
 
     private func editor(_ source: Source) -> some View {
@@ -101,7 +103,6 @@ struct VariableEditorView: View {
                 .disabled(copyingFrom)
             }
             Spacer()
-            Button(showValues ? "Hide Values" : "Show Values") { showValues.toggle() }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -186,15 +187,9 @@ struct VariableEditorView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
                     .onSubmit(quickAdd)
-                Group {
-                    if showValues {
-                        TextField("value", text: $newValue)
-                    } else {
-                        SecureField("value", text: $newValue)
-                    }
-                }
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(quickAdd)
+                TextField("value", text: $newValue)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(quickAdd)
                 Button("+ Add", action: quickAdd)
                     .disabled(newKey.trimmingCharacters(in: .whitespaces).isEmpty)
             }

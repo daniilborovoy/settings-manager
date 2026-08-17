@@ -272,6 +272,16 @@ final class Database {
         }
     }
 
+    func updateSourceConfig(id: Int64, config: [String: String]) throws {
+        let json = try JSONEncoder().encode(config)
+        guard try run(
+            "UPDATE sources SET config = ? WHERE id = ?",
+            [String(decoding: json, as: UTF8.self), id]
+        ) > 0 else {
+            throw AppError.notFound("Source")
+        }
+    }
+
     func deleteSource(id: Int64) throws {
         guard try run("DELETE FROM sources WHERE id = ?", [id]) > 0 else {
             throw AppError.notFound("Source")

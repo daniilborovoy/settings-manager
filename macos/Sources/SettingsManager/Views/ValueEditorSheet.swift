@@ -30,7 +30,7 @@ struct ValueEditorSheet: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 140)
+                .frame(width: 260)
                 Button("Format") {
                     do {
                         draft = try CodeFormat.format(draft, lang: lang)
@@ -49,11 +49,10 @@ struct ValueEditorSheet: View {
                 Text(formatError).foregroundStyle(.red).font(.callout)
             }
 
-            TextEditor(text: Binding(
+            CodeEditor(text: Binding(
                 get: { draft },
                 set: { draft = $0; if !formatError.isEmpty { formatError = "" } }
-            ))
-            .font(.system(size: 13, design: .monospaced))
+            ), lang: lang)
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(.quaternary))
 
             HStack {

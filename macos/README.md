@@ -37,16 +37,12 @@ builds can coexist on the same data.
 | `Providers/AWSProviders.swift` | `providers/lambda.rs` + `providers/secrets_manager.rs` (aws-sdk-swift) |
 | `AppStore.swift` | `App.tsx` state + `commands.rs` + `lib/api.ts` call logging |
 | `SecretGen.swift` | `lib/generate.ts` (rejection sampling, SecRandomCopyBytes) |
-| `CodeFormat.swift` | `lib/codeEditor.ts` (JSON/plain only) |
+| `CodeFormat.swift` | `lib/codeEditor.ts` (JSON via JSONSerialization, YAML via Yams, TOML via TOMLKit) |
+| `Views/CodeEditor.swift` | CodeMirror → NSTextView wrapper with JSON/YAML/TOML highlighting |
 | `Views/` | React components → List/.onMove (replaces dnd-kit), sheets (replaces modals), popover (SecretGenerator) |
 
 ## Deliberate cuts (ponytail)
 
-- **YAML/TOML formatting** — value editor formats JSON and plain text only.
-  Add [Yams](https://github.com/jpsim/Yams) / TOMLKit when someone misses it.
-- **Syntax highlighting** — `TextEditor` + monospaced font instead of
-  CodeMirror. A highlighting editor needs a third-party package or an
-  `NSTextView` wrapper; not worth it until it hurts.
 - **Comic style ✨** — CSS gimmick, not ported.
 - **JSON key order** — the JSON formatter sorts keys instead of preserving
   input order (`JSONSerialization` limitation).
@@ -55,6 +51,13 @@ builds can coexist on the same data.
 
 ## Troubleshooting
 
+- `cannot find type 'ServiceError'` in AWSProviders.swift — the protocol comes
+  from smithy-swift's ClientRuntime (imported transitively). If the import is
+  refused, depend on the `ClientRuntime` product of smithy-swift, or check the
+  protocol's current module (it may be `Smithy`).
+- TOML format errors at build time — TOMLKit's parse/serialize entry points
+  were written blind; if `TOMLTable(string:)` / `.convert()` don't compile,
+  check the package's README for the current names.
 - `no such module 'SmithyIdentity'` — the module comes transitively from
   aws-sdk-swift. If SPM refuses the import, add the `smithy-swift` package
   at the version pinned in aws-sdk-swift's `Package.resolved` and depend on

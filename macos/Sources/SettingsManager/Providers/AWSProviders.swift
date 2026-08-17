@@ -3,6 +3,18 @@ import AWSLambda
 import AWSSecretsManager
 import AWSSDKIdentity
 import SmithyIdentity
+import ClientRuntime
+
+/// Human-readable message instead of dumping the whole error struct
+/// (UnknownAWSHTTPServiceError(typeName: Optional(...), ...)).
+private func awsMessage(_ error: Error) -> String {
+    if let service = error as? ServiceError {
+        let type = service.typeName ?? "AWSError"
+        let message = service.message ?? ""
+        return message.isEmpty ? type : "\(type): \(message)"
+    }
+    return String(describing: error)
+}
 
 /// Builds a static-credentials resolver from the source config
 /// (port of aws_sdk_config in providers/mod.rs).
@@ -37,7 +49,7 @@ enum LambdaProvider {
         } catch let error as AppError {
             throw error
         } catch {
-            throw AppError.lambda(String(describing: error))
+            throw AppError.lambda(awsMessage(error))
         }
     }
 
@@ -54,7 +66,7 @@ enum LambdaProvider {
         } catch let error as AppError {
             throw error
         } catch {
-            throw AppError.lambda(String(describing: error))
+            throw AppError.lambda(awsMessage(error))
         }
     }
 }
@@ -95,7 +107,7 @@ enum SecretsManagerProvider {
         } catch let error as AppError {
             throw error
         } catch {
-            throw AppError.secretsManager(String(describing: error))
+            throw AppError.secretsManager(awsMessage(error))
         }
     }
 
@@ -113,7 +125,7 @@ enum SecretsManagerProvider {
         } catch let error as AppError {
             throw error
         } catch {
-            throw AppError.secretsManager(String(describing: error))
+            throw AppError.secretsManager(awsMessage(error))
         }
     }
 }

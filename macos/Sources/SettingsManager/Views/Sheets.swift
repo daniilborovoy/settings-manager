@@ -159,7 +159,81 @@ struct AddSourceSheet: View {
                     projectID: project.id,
                     name: name.trimmingCharacters(in: .whitespaces),
                     type: type,
-                    config: config
+                    // Pasted credentials often carry stray whitespace/newlines.
+                    config: config.mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                )
+                dismiss()
+            } catch {
+                self.error = error.localizedDescription
+            }
+            loading = false
+        }
+    }
+}
+
+// ── Edit Source config ──
+
+struct EditSourceSheet: View {
+    let source: Source
+
+    @Environment(AppStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var config: [String: String] = [:]
+    @State private var error: String?
+    @State private var loading = false
+
+    private var isComplete: Bool {
+        fields(for: source.type).allSatisfy { !(config[$0.key] ?? "").isEmpty }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Edit \(source.name)").font(.title3.bold())
+            Text(source.type.label)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            ForEach(fields(for: source.type), id: \.key) { field in
+                LabeledContent(field.label) {
+                    let binding = Binding(
+                        get: { config[field.key] ?? "" },
+                        set: { config[field.key] = $0 }
+                    )
+                    if field.secure {
+                        SecureField("", text: binding, prompt: Text(field.placeholder))
+                            .textFieldStyle(.roundedBorder)
+                    } else {
+                        TextField("", text: binding, prompt: Text(field.placeholder))
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+            }
+
+            if let error {
+                Text(error).foregroundStyle(.red).font(.callout).textSelection(.enabled)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button(loading ? "Saving..." : "Save", action: submit)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(loading || !isComplete)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .onAppear { config = store.sourceConfig(id: source.id) }
+    }
+
+    private func submit() {
+        error = nil
+        loading = true
+        Task {
+            do {
+                try await store.updateSourceConfig(
+                    id: source.id,
+                    config: config.mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 )
                 dismiss()
             } catch {

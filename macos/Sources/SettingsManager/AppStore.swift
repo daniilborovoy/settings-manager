@@ -30,6 +30,7 @@ final class AppStore {
     // Sheet presentation
     var showAddProject = false
     var addSourceProject: Project?
+    var editSource: Source?
     var tokenPrompt: TokenPrompt?
 
     let logs = LogStore()
@@ -201,6 +202,20 @@ final class AppStore {
             if selectedSourceID == id { selectedSourceID = nil }
             loadProjects()
         }
+    }
+
+    /// Current config of a source, for prefilling the edit sheet.
+    func sourceConfig(id: Int64) -> [String: String] {
+        (try? db.sourceConfig(id: id))?.config ?? [:]
+    }
+
+    func updateSourceConfig(id: Int64, config: [String: String]) async throws {
+        var args = redacted(config)
+        args["id"] = "\(id)"
+        _ = try await logged("update_source_config", args: args) {
+            try db.updateSourceConfig(id: id, config: config)
+        }
+        if selectedSourceID == id { refresh() }
     }
 
     func moveSources(projectID: Int64, from: IndexSet, to: Int) {
